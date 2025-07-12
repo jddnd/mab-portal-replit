@@ -354,6 +354,7 @@ def index(page):
             logs = [
                 {"id": row[0], "timestamp": row[1], "username": row[2], "role": row[3], "action": row[4], "details": row[5]}
                 for row in c.fetchall()
+            ]
         else:
             logs = None
 
@@ -369,6 +370,8 @@ def index(page):
                 'group_labels': list(group_counts.keys()),
                 'group_counts': list(group_counts.values())
             }
+        else:
+            chart_data = None
     
     enriched_devices = []
     for dev in pending_devices:
@@ -383,7 +386,7 @@ def index(page):
     settings_form = SettingsForm()
     log_action(session.get('username'), session.get('role'), 'Page Access', f"Viewed {page} page")
     return render_template('portal.html', page=page, devices=enriched_devices, mab_devices=mab_devices, 
-                           authorize_form=authorize_form, settings_form=settings_form, logs=logs, chart_data=chart_data if page == 'dashboard' else None)
+                           authorize_form=authorize_form, settings_form=settings_form, logs=logs, chart_data=chart_data)
 
 @app.route('/add-mab-device', methods=['GET', 'POST'])
 @role_required('Administrator', 'Contributor')
