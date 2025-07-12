@@ -1,117 +1,24 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="container">
-  <div class="navbar">
-    <div class="menu-toggle" onclick="toggleMenu()">☰</div>
-    <ul id="menu" class="hidden">
-      <li><a href="/">Dashboard</a></li>
-      <li><a href="/pending">Pending</a></li>
-      <li><a href="/devices">Devices</a></li>
-      {% if session['username'] == 'admin' %}
-      <li><a href="/settings">Settings</a></li>
-      {% endif %}
-    </ul>
-  </div>
-
-  {% if page == 'pending' %}
-  <div class="section">
-    <h2>Pending Devices for Authorization</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>MAC Address</th>
-          <th>Seen On</th>
-          <th>Switch</th>
-          <th>Location</th>
-          <th>Port</th>
-          <th>Authorize</th>
-        </tr>
-      </thead>
-      <tbody id="pending-devices">
-        {% for device in devices %}
-        <tr>
-          <td>{{ device.mac }}</td>
-          <td>{{ device.seen }}</td>
-          <td>{{ device.switch }}</td>
-          <td>{{ device.location }}</td>
-          <td>{{ device.port }}</td>
-          <td>
-            <form method="POST" action="/authorize-device" onsubmit="return confirm('Authorize this device?');">
-              <input type="hidden" name="mac" value="{{ device.mac }}" />
-              <select name="group" required>
-                <option value="">-- Select Group --</option>
-                <option value="Printers">Printers</option>
-                <option value="IoT_Meeting">IoT_Meeting</option>
-                <option value="Mgmt_AP">Mgmt_AP</option>
-                <option value="Mgmt_SW">Mgmt_SW</option>
-              </select>
-              <button type="submit">Authorize</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  {% elif page == 'devices' %}
-  <div class="section">
-    <h2>All MAB Devices</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>MAC Address</th>
-          <th>Description</th>
-          <th>Group</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for device in mab_devices %}
-        <tr>
-          <td>{{ device.mac }}</td>
-          <td>{{ device.desc }}</td>
-          <td>{{ device.group }}</td>
-          <td>
-            <form action="/edit-device" method="GET" style="display:inline-block">
-              <input type="hidden" name="mac" value="{{ device.mac }}">
-              <button type="submit">Edit</button>
-            </form>
-            <form action="/delete-device" method="POST" style="display:inline-block" onsubmit="return confirm('Delete this device?');">
-              <input type="hidden" name="mac" value="{{ device.mac }}">
-              <button type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <br>
-    <a href="/add-device">Add New Device</a>
-  </div>
-
-  {% elif page == 'dashboard' %}
-  <div class="section">
-    <h2>Dashboard</h2>
-    <p>Status and system insights will be displayed here.</p>
-  </div>
-
-  {% elif page == 'settings' %}
-  {% if session['username'] == 'admin' %}
-  <div class="section">
-    <h2>Settings</h2>
-    <p>Settings configuration will be added here.</p>
-  </div>
-  {% endif %}
-  {% endif %}
-
-  <div class="footer">Cisco ISE Device Portal • Internal IT Access Only • Logged & Secured</div>
-</div>
-
-<script>
-  function toggleMenu() {
-    var menu = document.getElementById("menu");
-    menu.classList.toggle("hidden");
-  }
-</script>
-{% endblock %}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Device Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    .container { padding: 20px; }
+    .navbar { background: #333; color: white; padding: 10px; }
+    .menu-toggle { cursor: pointer; font-size: 24px; }
+    ul { list-style-type: none; padding: 0; margin: 10px 0; }
+    ul.hidden { display: none; }
+    ul li { margin: 5px 0; }
+    ul li a { color: white; text-decoration: none; }
+    .section { margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    .footer { text-align: center; font-size: 0.9em; color: #888; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>
