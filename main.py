@@ -27,6 +27,12 @@ bcrypt = Bcrypt(app)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Custom Jinja2 filter for ternary operation
+def ternary_filter(value, true_val, false_val):
+    return true_val if value else false_val
+
+app.jinja_env.filters['ternary'] = ternary_filter
+
 # Initialize SQLite database
 def init_db():
     with sqlite3.connect('devices.db') as conn:
