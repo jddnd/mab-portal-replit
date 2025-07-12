@@ -24,18 +24,72 @@
 {% if page == 'dashboard' %}
 <div class="bg-white p-6 rounded-lg shadow-md">
     <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
-    <p>Status and system insights will be displayed here.</p>
+    <p>Status and system insights</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div class="bg-gray-100 p-4 rounded-lg">
             <h3 class="text-lg font-medium">Pending Devices</h3>
-            <p>{{ devices|length }} devices awaiting authorization</p>
+            <p>{{ chart_data.pending_count }} devices awaiting authorization</p>
         </div>
         <div class="bg-gray-100 p-4 rounded-lg">
             <h3 class="text-lg font-medium">Authorized Devices</h3>
-            <p>{{ mab_devices|length }} devices authorized</p>
+            <p>{{ chart_data.authorized_count }} devices authorized</p>
         </div>
     </div>
+    <div class="mt-6">
+        <h3 class="text-lg font-medium mb-4">Device Status</h3>
+        <canvas id="deviceStatusChart" class="w-full max-w-md mx-auto"></canvas>
+    </div>
+    <div class="mt-6">
+        <h3 class="text-lg font-medium mb-4">Device Groups</h3>
+        <canvas id="groupDistributionChart" class="w-full max-w-md mx-auto"></canvas>
+    </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const deviceStatusChart = new Chart(document.getElementById('deviceStatusChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Pending', 'Authorized'],
+            datasets: [{
+                label: 'Device Count',
+                data: [{{ chart_data.pending_count }}, {{ chart_data.authorized_count }}],
+                backgroundColor: ['#4CAF50', '#2196F3'],
+                borderColor: ['#388E3C', '#1976D2'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Number of Devices' }
+                },
+                x: { title: { display: true, text: 'Status' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    const groupDistributionChart = new Chart(document.getElementById('groupDistributionChart'), {
+        type: 'pie',
+        data: {
+            labels: {{ chart_data.group_labels | tojson }},
+            datasets: [{
+                label: 'Devices by Group',
+                data: {{ chart_data.group_counts | tojson }},
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'],
+                borderColor: ['#FF4069', '#1E87D8', '#FFB300', '#3DA8A8'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { position: 'right' },
+                title: { display: true, text: 'Device Group Distribution' }
+            }
+        }
+    });
+</script>
 
 {% elif page == 'pending' and session['role'] in ['Administrator', 'Approver'] %}
 <div class="bg-white p-6 rounded-lg shadow-md">
