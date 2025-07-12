@@ -1,22 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-  <h2>Edit MAB Device</h2>
-  <form method="POST" action="/edit-device">
-    <input type="hidden" name="mac" value="{{ device.mac }}">
-
-    <label for="desc">Description:</label>
-    <input type="text" name="desc" value="{{ device.desc }}" required>
-
-    <label for="group">Group:</label>
-    <select name="group" required>
-      <option value="Printers" {% if device.group == 'Printers' %}selected{% endif %}>Printers</option>
-      <option value="IoT_Meeting" {% if device.group == 'IoT_Meeting' %}selected{% endif %}>IoT_Meeting</option>
-      <option value="Mgmt_AP" {% if device.group == 'Mgmt_AP' %}selected{% endif %}>Mgmt_AP</option>
-      <option value="Mgmt_SW" {% if device.group == 'Mgmt_SW' %}selected{% endif %}>Mgmt_SW</option>
-    </select>
-
-    <button type="submit">Save Changes</button>
-  </form>
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-xl font-semibold mb-4">Edit MAB Device</h2>
+    <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div>
+            <label class="block text-sm font-medium text-gray-700">MAC Address</label>
+            {{ form.mac(class="mt-1 p-2 w-full border rounded-md bg-gray-100") }}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Description</label>
+            {{ form.description(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.description.errors %}
+                <p class="text-red-500 text-sm">{{ form.description.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Group</label>
+            {{ form.group(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.group.errors %}
+                <p class="text-red-500 text-sm">{{ form.group.errors[0] }}</p>
+            {% endif %}
+        </div>
+        {{ form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600") }}
+    </form>
 </div>
 {% endblock %}
