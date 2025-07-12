@@ -1,3 +1,6 @@
-flask
-pysnmp
-flask-wtf
+flask 
+pysnmp 
+flask-wtf 
+flask-bcrypt 
+bleach 
+requests
