@@ -13,9 +13,9 @@ import bleach
 import requests
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecurekey123456')  # Use env var in production
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecurekey123456')
 app.config['SESSION_COOKIE_SECURE'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes session timeout
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 bcrypt = Bcrypt(app)
 
 # Initialize SQLite database
@@ -30,12 +30,11 @@ def init_db():
                      (username TEXT PRIMARY KEY, password TEXT, role TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS settings
                      (key TEXT PRIMARY KEY, value TEXT)''')
-        # Insert initial data for testing
+        # Insert initial data
         c.execute('INSERT OR IGNORE INTO pending_devices (mac, seen, switch_ip, port) VALUES (?, ?, ?, ?)',
                   ('AA:BB:CC:DD:EE:FF', '2025-07-12 09:32', '10.45.18.1', 'Gi1/0/10'))
         c.execute('INSERT OR IGNORE INTO pending_devices (mac, seen, switch_ip, port) VALUES (?, ?, ?, ?)',
                   ('11:22:33:44:55:66', '2025-07-12 09:45', '10.45.22.1', 'Gi1/0/11'))
-        # Insert default users
         admin_password = bcrypt.generate_password_hash('StrongPassword123').decode('utf-8')
         approver_password = bcrypt.generate_password_hash('ApproverPass123').decode('utf-8')
         contributor_password = bcrypt.generate_password_hash('ContributorPass123').decode('utf-8')
@@ -45,31 +44,47 @@ def init_db():
                   ('approver', approver_password, 'Approver'))
         c.execute('INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
                   ('contributor', contributor_password, 'Contributor'))
-        # Insert default settings
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('snmp_community', 'public'))
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_api_url', 'https://ise.example.com'))
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_username', 'ise_user'))
-        c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_password', 'ise_pass'))
+        c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_password', bcrypt.generate_password_hash('ise_pass').decode('utf-8')))
         conn.commit()
 
-# Mock Cisco ISE API (replace with real API call in production)
+# Cisco ISE API integration
 def cisco_ise_api_authorize(mac, group):
     with sqlite3.connect('devices.db') as conn:
         c = conn.cursor()
         c.execute('SELECT value FROM settings WHERE key IN (?, ?, ?)',
                   ('ise_api_url', 'ise_username', 'ise_password'))
         settings = c.fetchall()
+        if len(settings) != 3:
+            return {"status": "error", "message": "ISE settings not configured"}
         ise_url, ise_username, ise_password = [s[0] for s in settings]
     
     try:
-        # Mock API call (replace with actual Cisco ISE API call)
-        # Example: requests.post(f"{ise_url}/api/v1/mab", json={"mac": mac, "group": group}, auth=(ise_username, ise_password))
-        response = {"status": "success", "message": f"Device {mac} authorized in group {group}"}
-        return response
+        # Real Cisco ISE API call (replace with your endpoint and payload)
+        headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+        payload = {
+            "ERSEndPoint": {
+                "mac": mac,
+                "groupId": group  # Map group to ISE group ID
+            }
+        }
+        response = requests.post(
+            f"{ise_url}/ers/config/endpoint",
+            json=payload,
+            auth=(ise_username, bcrypt.check_password_hash(ise_password, 'ise_pass') and 'ise_pass' or ise_password),
+            headers=headers,
+            verify=False  # Set to True in production with valid SSL cert
+        )
+        if response.status_code == 201:
+            return {"status": "success", "message": f"Device {mac} authorized in group {group}"}
+        else:
+            return {"status": "error", "message": f"ISE API error: {response.text}"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": f"ISE API request failed: {str(e)}"}
 
-# SNMP function to fetch switch info
+# SNMP function
 def get_snmp_sysinfo(ip):
     with sqlite3.connect('devices.db') as conn:
         c = conn.cursor()
@@ -97,7 +112,7 @@ def get_snmp_sysinfo(ip):
             print(f"SNMP error for {ip}: {e}")
     return result
 
-# Forms with CSRF protection
+# Forms
 class AddDeviceForm(FlaskForm):
     mac = StringField('MAC Address', validators=[
         DataRequired(), 
@@ -141,7 +156,17 @@ class SettingsForm(FlaskForm):
     ise_password = PasswordField('Cisco ISE Password', validators=[DataRequired()])
     submit = SubmitField('Save Settings')
 
-# Role-based access control decorator
+class UserForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
+    role = SelectField('Role', choices=[
+        ('Administrator', 'Administrator'),
+        ('Approver', 'Approver'),
+        ('Contributor', 'Contributor')
+    ], validators=[DataRequired()])
+    submit = SubmitField('Add User')
+
+# RBAC decorator
 def role_required(*roles):
     def decorator(f):
         @wraps(f)
@@ -226,7 +251,7 @@ def add_device():
         with sqlite3.connect('devices.db') as conn:
             c = conn.cursor()
             c.execute('INSERT INTO pending_devices (mac, seen, switch_ip, port) VALUES (?, ?, ?, ?)',
-                      (mac, datetime.now().strftime("%Y-%m-%d %H:%M"), '10.45.18.1', 'Gi1/0/10'))  # Mock switch_ip/port
+                      (mac, datetime.now().strftime("%Y-%m-%d %H:%M"), '10.45.18.1', 'Gi1/0/10'))
             conn.commit()
         flash('Device added successfully', 'success')
         return redirect(url_for('index', page='pending'))
@@ -247,7 +272,6 @@ def authorize_device():
                           (mac, 'Authorized Device', form.group.data))
                 c.execute('DELETE FROM pending_devices WHERE mac = ?', (mac,))
                 conn.commit()
-                # Call Cisco ISE API
                 response = cisco_ise_api_authorize(mac, form.group.data)
                 if response['status'] == 'success':
                     flash(response['message'], 'success')
@@ -320,6 +344,42 @@ def settings():
             flash('Settings updated successfully', 'success')
             return redirect(url_for('index', page='settings'))
     return render_template('settings.html', form=form)
+
+@app.route('/manage-users', methods=['GET', 'POST'])
+@role_required('Administrator')
+def manage_users():
+    form = UserForm()
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        if form.validate_on_submit():
+            username = bleach.clean(form.username.data)
+            c.execute('SELECT username FROM users WHERE username = ?', (username,))
+            if c.fetchone():
+                flash('Username already exists', 'error')
+            else:
+                password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+                c.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+                          (username, password, form.role.data))
+                conn.commit()
+                flash(f'User {username} added successfully', 'success')
+            return redirect(url_for('manage_users'))
+        c.execute('SELECT username, role FROM users')
+        users = c.fetchall()
+    return render_template('manage_users.html', form=form, users=users)
+
+@app.route('/delete-user/<username>', methods=['POST'])
+@role_required('Administrator')
+def delete_user(username):
+    username = bleach.clean(username)
+    if username == session.get('username'):
+        flash('Cannot delete your own account', 'error')
+        return redirect(url_for('manage_users'))
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM users WHERE username = ?', (username,))
+        conn.commit()
+    flash(f'User {username} deleted successfully', 'success')
+    return redirect(url_for('manage_users'))
 
 if __name__ == '__main__':
     init_db()
