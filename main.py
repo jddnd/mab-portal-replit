@@ -3,11 +3,13 @@ from datetime import datetime
 import re
 
 app = Flask(__name__)
-app.secret_key = 'supersecurekey123456'
+app.secret_key = 'supersecurekey123456'  # Change this in production!
 
+# Static credentials (for demo)
 USERNAME = 'admin'
 PASSWORD = 'StrongPassword123'
 
+# Sample pending device list
 pending_devices = [
     {
         "mac": "AA:BB:CC:DD:EE:FF",
@@ -23,7 +25,8 @@ def is_valid_mac(mac):
 
 @app.before_request
 def require_login():
-    if request.endpoint not in ['login', 'static'] and not session.get('logged_in'):
+    allowed = ['login', 'static']
+    if request.endpoint not in allowed and not session.get('logged_in'):
         return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -31,7 +34,8 @@ def login():
     if request.method == 'POST':
         if request.form['username'] == USERNAME and request.form['password'] == PASSWORD:
             session['logged_in'] = True
-            return redirect(url_for('index'))
+            session['username'] = USERNAME
+            return redirect(url_for('dashboard'))
         flash('Invalid credentials')
     return render_template('login.html')
 
@@ -41,8 +45,18 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/')
-def index():
-    return render_template('portal.html', devices=pending_devices)
+def dashboard():
+    return render_template('portal.html', page='dashboard', devices=pending_devices)
+
+@app.route('/pending')
+def pending():
+    return render_template('portal.html', page='pending', devices=pending_devices)
+
+@app.route('/settings')
+def settings():
+    if session.get('username') != 'admin':
+        abort(403)
+    return render_template('portal.html', page='settings', devices=[])
 
 @app.route('/authorize-device', methods=['POST'])
 def authorize_device():
@@ -50,7 +64,8 @@ def authorize_device():
     group = request.form.get('group')
     if not is_valid_mac(mac) or group not in ['Printers', 'IoT_Meeting', 'Mgmt_AP', 'Mgmt_SW']:
         abort(400)
-    return redirect(url_for('index'))
+    print(f"[INFO] Authorized device: {mac} to group: {group}")
+    return redirect(url_for('pending'))
 
 @app.route('/add-mab-device', methods=['POST'])
 def add_device():
@@ -59,7 +74,8 @@ def add_device():
     desc = request.form.get('desc')
     if not is_valid_mac(mac) or group not in ['Printers', 'IoT_Meeting', 'Mgmt_AP', 'Mgmt_SW'] or len(desc.strip()) < 3:
         abort(400)
-    return redirect(url_for('index'))
+    print(f"[INFO] Manually added device: {mac}, desc: {desc}, group: {group}")
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000)
+    app.run(host='0.0.0.0', port=3000, debug=True)
