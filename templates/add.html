@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>Add New MAB Device</h2>
+  <form method="POST" action="/add-device">
+    <label for="mac">MAC Address:</label>
+    <input type="text" name="mac" required placeholder="AA:BB:CC:DD:EE:FF">
+
+    <label for="desc">Description:</label>
+    <input type="text" name="desc" required placeholder="Printer HR DK-02">
+
+    <label for="group">Group:</label>
+    <select name="group" required>
+      <option value="">-- Select Group --</option>
+      <option value="Printers">Printers</option>
+      <option value="IoT_Meeting">IoT_Meeting</option>
+      <option value="Mgmt_AP">Mgmt_AP</option>
+      <option value="Mgmt_SW">Mgmt_SW</option>
+    </select>
+    <button type="submit">Add Device</button>
+  </form>
+</div>
+{% endblock %}

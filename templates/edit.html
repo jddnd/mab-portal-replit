@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>Edit MAB Device</h2>
+  <form method="POST" action="/edit-device">
+    <input type="hidden" name="mac" value="{{ device.mac }}">
+
+    <label for="desc">Description:</label>
+    <input type="text" name="desc" value="{{ device.desc }}" required>
+
+    <label for="group">Group:</label>
+    <select name="group" required>
+      <option value="Printers" {% if device.group == 'Printers' %}selected{% endif %}>Printers</option>
+      <option value="IoT_Meeting" {% if device.group == 'IoT_Meeting' %}selected{% endif %}>IoT_Meeting</option>
+      <option value="Mgmt_AP" {% if device.group == 'Mgmt_AP' %}selected{% endif %}>Mgmt_AP</option>
+      <option value="Mgmt_SW" {% if device.group == 'Mgmt_SW' %}selected{% endif %}>Mgmt_SW</option>
+    </select>
+
+    <button type="submit">Save Changes</button>
+  </form>
+</div>
+{% endblock %}
