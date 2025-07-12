@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-xl font-semibold mb-4">Settings</h2>
+    <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div>
+            <label class="block text-sm font-medium text-gray-700">SNMP Community String</label>
+            {{ form.snmp_community(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.snmp_community.errors %}
+                <p class="text-red-500 text-sm">{{ form.snmp_community.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cisco ISE API URL</label>
+            {{ form.ise_api_url(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.ise_api_url.errors %}
+                <p class="text-red-500 text-sm">{{ form.ise_api_url.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cisco ISE Username</label>
+            {{ form.ise_username(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.ise_username.errors %}
+                <p class="text-red-500 text-sm">{{ form.ise_username.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cisco ISE Password</label>
+            {{ form.ise_password(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.ise_password.errors %}
+                <p class="text-red-500 text-sm">{{ form.ise_password.errors[0] }}</p>
+            {% endif %}
+        </div>
+        {{ form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600") }}
+    </form>
+</div>
+{% endblock %}
