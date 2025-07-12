@@ -11,7 +11,9 @@
                 <a href="{{ url_for('index', page='devices') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'devices' else '' }}">Devices</a>
                 <a href="{{ url_for('settings') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'settings' else '' }}">Settings</a>
                 <a href="{{ url_for('manage_users') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Manage Users</a>
+                <a href="{{ url_for('index', page='audit_log') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'audit_log' else '' }}">Audit Log</a>
             {% endif %}
+            <a href="{{ url_for('two_factor_setup') }}" class="hover:bg-gray-700 px-3 py-2 rounded">2FA Setup</a>
         </div>
         <div>
             <a href="{{ url_for('logout') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Logout</a>
@@ -141,6 +143,33 @@
         </div>
         {{ settings_form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600") }}
     </form>
+</div>
+
+{% elif page == 'audit_log' and session['role'] == 'Administrator' %}
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-xl font-semibold mb-4">Audit Log</h2>
+    <table class="w-full table-auto">
+        <thead>
+            <tr class="bg-gray-200">
+                <th class="px-4 py-2">Timestamp</th>
+                <th class="px-4 py-2">Username</th>
+                <th class="px-4 py-2">Role</th>
+                <th class="px-4 py-2">Action</th>
+                <th class="px-4 py-2">Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr class="border-t">
+                <td class="px-4 py-2">{{ log.timestamp }}</td>
+                <td class="px-4 py-2">{{ log.username }}</td>
+                <td class="px-4 py-2">{{ log.role }}</td>
+                <td class="px-4 py-2">{{ log.action }}</td>
+                <td class="px-4 py-2">{{ log.details }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endif %}
 {% endblock %}
