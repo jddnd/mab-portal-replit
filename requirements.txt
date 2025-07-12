@@ -1,6 +1,6 @@
 flask
 pysnmp
-fla
+flask-wtf
 wtforms
 flask-bcrypt
 bleach
