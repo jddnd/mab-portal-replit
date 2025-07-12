@@ -1,4 +1,7 @@
 flask
 pysnmp
-flask-wtf
+fla
 wtforms
+flask-bcrypt
+bleach
+requests

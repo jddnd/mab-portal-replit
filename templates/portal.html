@@ -4,10 +4,12 @@
     <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
             <a href="{{ url_for('index', page='dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'dashboard' else '' }}">Dashboard</a>
-            <a href="{{ url_for('index', page='pending') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'pending' else '' }}">Pending</a>
-            <a href="{{ url_for('index', page='devices') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'devices' else '' }}">Devices</a>
-            {% if session['username'] == 'admin' %}
-                <a href="{{ url_for('index', page='settings') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'settings' else '' }}">Settings</a>
+            {% if session['role'] in ['Administrator', 'Approver'] %}
+                <a href="{{ url_for('index', page='pending') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'pending' else '' }}">Pending</a>
+            {% endif %}
+            {% if session['role'] == 'Administrator' %}
+                <a href="{{ url_for('index', page='devices') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'devices' else '' }}">Devices</a>
+                <a href="{{ url_for('settings') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'settings' else '' }}">Settings</a>
             {% endif %}
         </div>
         <div>
@@ -32,7 +34,7 @@
     </div>
 </div>
 
-{% elif page == 'pending' %}
+{% elif page == 'pending' and session['role'] in ['Administrator', 'Approver'] %}
 <div class="bg-white p-6 rounded-lg shadow-md">
     <h2 class="text-xl font-semibold mb-4">Pending Devices for Authorization</h2>
     <table class="w-full table-auto">
@@ -72,7 +74,7 @@
     <a href="{{ url_for('add_device') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Add New Device</a>
 </div>
 
-{% elif page == 'devices' %}
+{% elif page == 'devices' and session['role'] == 'Administrator' %}
 <div class="bg-white p-6 rounded-lg shadow-md">
     <h2 class="text-xl font-semibold mb-4">All MAB Devices</h2>
     <table class="w-full table-auto">
@@ -103,16 +105,41 @@
     <a href="{{ url_for('add_device') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-4 inline-block">Add New Device</a>
 </div>
 
-{% elif page == 'settings' %}
-{% if session['username'] == 'admin' %}
+{% elif page == 'settings' and session['role'] == 'Administrator' %}
 <div class="bg-white p-6 rounded-lg shadow-md">
     <h2 class="text-xl font-semibold mb-4">Settings</h2>
-    <p>Settings configuration will be added here.</p>
-    <div class="mt-4">
-        <h3 class="text-lg font-medium">System Configuration</h3>
-        <p>Manage Cisco ISE integration settings, SNMP community strings, and user permissions.</p>
-    </div>
+    <form method="POST" action="{{ url_for('settings') }}" class="space-y-4">
+        {{ settings_form.hidden_tag() }}
+        <div>
+            <label class="block text-sm font-medium text-gray-700">SNMP Community String</label>
+            {{ settings_form.snmp_community(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if settings_form.snmp_community.errors %}
+                <p class="text-red-500 text-sm">{{ settings_form.snmp_community.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cisco ISE API URL</label>
+            {{ settings_form.ise_api_url(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if settings_form.ise_api_url.errors %}
+                <p class="text-red-500 text-sm">{{ settings_form.ise_api_url.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cisco ISE Username</label>
+            {{ settings_form.ise_username(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if settings_form.ise_username.errors %}
+                <p class="text-red-500 text-sm">{{ settings_form.ise_username.errors[0] }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cisco ISE Password</label>
+            {{ settings_form.ise_password(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if settings_form.ise_password.errors %}
+                <p class="text-red-500 text-sm">{{ settings_form.ise_password.errors[0] }}</p>
+            {% endif %}
+        </div>
+        {{ settings_form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600") }}
+    </form>
 </div>
-{% endif %}
 {% endif %}
 {% endblock %}
