@@ -1,0 +1,7 @@
+flask
+pysnmp
+flask-wtf
+wtforms
+flask-bcrypt
+bleach
+requests
