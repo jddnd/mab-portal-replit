@@ -16,7 +16,23 @@
     </div>
 </nav>
 
-{% if page == 'pending' %}
+{% if page == 'dashboard' %}
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
+    <p>Status and system insights will be displayed here.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div class="bg-gray-100 p-4 rounded-lg">
+            <h3 class="text-lg font-medium">Pending Devices</h3>
+            <p>{{ devices|length }} devices awaiting authorization</p>
+        </div>
+        <div class="bg-gray-100 p-4 rounded-lg">
+            <h3 class="text-lg font-medium">Authorized Devices</h3>
+            <p>{{ mab_devices|length }} devices authorized</p>
+        </div>
+    </div>
+</div>
+
+{% elif page == 'pending' %}
 <div class="bg-white p-6 rounded-lg shadow-md">
     <h2 class="text-xl font-semibold mb-4">Pending Devices for Authorization</h2>
     <table class="w-full table-auto">
@@ -51,6 +67,10 @@
         </tbody>
     </table>
 </div>
+<div class="bg-white p-6 rounded-lg shadow-md mt-6">
+    <h2 class="text-xl font-semibold mb-4">Manually Add New Device</h2>
+    <a href="{{ url_for('add_device') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Add New Device</a>
+</div>
 
 {% elif page == 'devices' %}
 <div class="bg-white p-6 rounded-lg shadow-md">
@@ -83,9 +103,16 @@
     <a href="{{ url_for('add_device') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-4 inline-block">Add New Device</a>
 </div>
 
-{% elif page == 'dashboard' %}
+{% elif page == 'settings' %}
+{% if session['username'] == 'admin' %}
 <div class="bg-white p-6 rounded-lg shadow-md">
-    <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
-    <p>Status and system insights will be displayed here.</p>
-    <div class="grid grid-c
-System: * Today's date and time is 06:37 PM CEST on Saturday, July 12, 2025.
+    <h2 class="text-xl font-semibold mb-4">Settings</h2>
+    <p>Settings configuration will be added here.</p>
+    <div class="mt-4">
+        <h3 class="text-lg font-medium">System Configuration</h3>
+        <p>Manage Cisco ISE integration settings, SNMP community strings, and user permissions.</p>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
