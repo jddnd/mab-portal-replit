@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, PasswordField
-from wtforms.validators import DataRequired, Regexp, Length
+from wtforms.validators import DataRequired, Regexp, Length, ValidationError
 from datetime import datetime
 import sqlite3
 import re
@@ -131,6 +131,20 @@ def get_snmp_sysinfo(ip):
             logger.error(f"SNMP error for {ip}: {e}")
     return result
 
+# Password complexity validator
+def password_complexity(form, field):
+    password = field.data
+    if len(password) < 12:
+        raise ValidationError('Password must be at least 12 characters long.')
+    if not re.search(r'[A-Z]', password):
+        raise ValidationError('Password must contain at least one uppercase letter.')
+    if not re.search(r'[a-z]', password):
+        raise ValidationError('Password must contain at least one lowercase letter.')
+    if not re.search(r'[0-9]', password):
+        raise ValidationError('Password must contain at least one digit.')
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        raise ValidationError('Password must contain at least one special character.')
+
 # Forms
 class AddDeviceForm(FlaskForm):
     mac = StringField('MAC Address', validators=[
@@ -172,12 +186,12 @@ class SettingsForm(FlaskForm):
     snmp_community = StringField('SNMP Community String', validators=[DataRequired()])
     ise_api_url = StringField('Cisco ISE API URL', validators=[DataRequired()])
     ise_username = StringField('Cisco ISE Username', validators=[DataRequired()])
-    ise_password = PasswordField('Cisco ISE Password', validators=[DataRequired()])
+    ise_password = PasswordField('Cisco ISE Password', validators=[DataRequired(), password_complexity])
     submit = SubmitField('Save Settings')
 
 class UserForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3)])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=12), password_complexity])
     role = SelectField('Role', choices=[
         ('Administrator', 'Administrator'),
         ('Approver', 'Approver'),
@@ -248,6 +262,7 @@ def two_factor_verify():
             user = c.fetchone()
             if not user:
                 flash('User not found', 'error')
+                log_action(username, 'Unknown', 'Login Failed', 'User not found')
                 return redirect(url_for('login'))
             totp_secret, role = user
             if totp_secret and pyotp.TOTP(totp_secret).verify(form.totp_code.data):
@@ -323,7 +338,21 @@ def index(page):
             logs = [
                 {"id": row[0], "timestamp": row[1], "username": row[2], "role": row[3], "action": row[4], "details": row[5]}
                 for row in c.fetchall()
-            ]
+        else:
+            logs = None
+
+        # Data for dashboard charts
+        if page == 'dashboard':
+            group_counts = {}
+            for device in mab_devices:
+                group = device['group']
+                group_counts[group] = group_counts.get(group, 0) + 1
+            chart_data = {
+                'pending_count': len(pending_devices),
+                'authorized_count': len(mab_devices),
+                'group_labels': list(group_counts.keys()),
+                'group_counts': list(group_counts.values())
+            }
     
     enriched_devices = []
     for dev in pending_devices:
@@ -338,7 +367,7 @@ def index(page):
     settings_form = SettingsForm()
     log_action(session.get('username'), session.get('role'), 'Page Access', f"Viewed {page} page")
     return render_template('portal.html', page=page, devices=enriched_devices, mab_devices=mab_devices, 
-                           authorize_form=authorize_form, settings_form=settings_form, logs=logs if page == 'audit_log' else None)
+                           authorize_form=authorize_form, settings_form=settings_form, logs=logs, chart_data=chart_data if page == 'dashboard' else None)
 
 @app.route('/add-mab-device', methods=['GET', 'POST'])
 @role_required('Administrator', 'Contributor')
