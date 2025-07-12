@@ -11,12 +11,21 @@ from functools import wraps
 from flask_bcrypt import Bcrypt
 import bleach
 import requests
+import pyotp
+import qrcode
+import base64
+from io import BytesIO
+import logging
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecurekey123456')
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 bcrypt = Bcrypt(app)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Initialize SQLite database
 def init_db():
@@ -27,9 +36,11 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS mab_devices
                      (mac TEXT PRIMARY KEY, description TEXT, group_name TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS users
-                     (username TEXT PRIMARY KEY, password TEXT, role TEXT)''')
+                     (username TEXT PRIMARY KEY, password TEXT, role TEXT, totp_secret TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS settings
                      (key TEXT PRIMARY KEY, value TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS audit_log
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, username TEXT, role TEXT, action TEXT, details TEXT)''')
         # Insert initial data
         c.execute('INSERT OR IGNORE INTO pending_devices (mac, seen, switch_ip, port) VALUES (?, ?, ?, ?)',
                   ('AA:BB:CC:DD:EE:FF', '2025-07-12 09:32', '10.45.18.1', 'Gi1/0/10'))
@@ -38,17 +49,26 @@ def init_db():
         admin_password = bcrypt.generate_password_hash('StrongPassword123').decode('utf-8')
         approver_password = bcrypt.generate_password_hash('ApproverPass123').decode('utf-8')
         contributor_password = bcrypt.generate_password_hash('ContributorPass123').decode('utf-8')
-        c.execute('INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-                  ('admin', admin_password, 'Administrator'))
-        c.execute('INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-                  ('approver', approver_password, 'Approver'))
-        c.execute('INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-                  ('contributor', contributor_password, 'Contributor'))
+        c.execute('INSERT OR IGNORE INTO users (username, password, role, totp_secret) VALUES (?, ?, ?, ?)',
+                  ('admin', admin_password, 'Administrator', ''))
+        c.execute('INSERT OR IGNORE INTO users (username, password, role, totp_secret) VALUES (?, ?, ?, ?)',
+                  ('approver', approver_password, 'Approver', ''))
+        c.execute('INSERT OR IGNORE INTO users (username, password, role, totp_secret) VALUES (?, ?, ?, ?)',
+                  ('contributor', contributor_password, 'Contributor', ''))
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('snmp_community', 'public'))
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_api_url', 'https://ise.example.com'))
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_username', 'ise_user'))
         c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ise_password', bcrypt.generate_password_hash('ise_pass').decode('utf-8')))
         conn.commit()
+
+# Log user actions
+def log_action(username, role, action, details):
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('INSERT INTO audit_log (timestamp, username, role, action, details) VALUES (?, ?, ?, ?, ?)',
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), username, role, action, details))
+        conn.commit()
+    logger.info(f"Action logged: {username} ({role}) - {action}: {details}")
 
 # Cisco ISE API integration
 def cisco_ise_api_authorize(mac, group):
@@ -62,12 +82,11 @@ def cisco_ise_api_authorize(mac, group):
         ise_url, ise_username, ise_password = [s[0] for s in settings]
     
     try:
-        # Real Cisco ISE API call (replace with your endpoint and payload)
         headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         payload = {
             "ERSEndPoint": {
                 "mac": mac,
-                "groupId": group  # Map group to ISE group ID
+                "groupId": group
             }
         }
         response = requests.post(
@@ -75,7 +94,7 @@ def cisco_ise_api_authorize(mac, group):
             json=payload,
             auth=(ise_username, bcrypt.check_password_hash(ise_password, 'ise_pass') and 'ise_pass' or ise_password),
             headers=headers,
-            verify=False  # Set to True in production with valid SSL cert
+            verify=False
         )
         if response.status_code == 201:
             return {"status": "success", "message": f"Device {mac} authorized in group {group}"}
@@ -109,7 +128,7 @@ def get_snmp_sysinfo(ip):
                 for varBind in varBinds:
                     result[key] = str(varBind[1])
         except Exception as e:
-            print(f"SNMP error for {ip}: {e}")
+            logger.error(f"SNMP error for {ip}: {e}")
     return result
 
 # Forms
@@ -166,6 +185,10 @@ class UserForm(FlaskForm):
     ], validators=[DataRequired()])
     submit = SubmitField('Add User')
 
+class TwoFactorForm(FlaskForm):
+    totp_code = StringField('2FA Code', validators=[DataRequired(), Length(min=6, max=6)])
+    submit = SubmitField('Verify')
+
 # RBAC decorator
 def role_required(*roles):
     def decorator(f):
@@ -176,10 +199,68 @@ def role_required(*roles):
             user_role = session.get('role')
             if user_role not in roles:
                 flash('Unauthorized access', 'error')
+                log_action(session.get('username'), user_role, 'Unauthorized Access', f"Attempted access to {request.path}")
                 abort(403)
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+# 2FA setup and verification
+@app.route('/2fa-setup', methods=['GET', 'POST'])
+def two_factor_setup():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    username = session.get('username')
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('SELECT totp_secret FROM users WHERE username = ?', (username,))
+        totp_secret = c.fetchone()[0]
+    
+    if not totp_secret:
+        totp_secret = pyotp.random_base32()
+        c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', (totp_secret, username))
+        conn.commit()
+    
+    totp = pyotp.TOTP(totp_secret)
+    qr_uri = totp.provisioning_uri(name=username, issuer_name='Cisco ISE Device Portal')
+    
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(qr_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    qr_code = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    log_action(username, session.get('role'), '2FA Setup', 'Generated 2FA QR code')
+    return render_template('2fa_setup.html', qr_code=qr_code, totp_secret=totp_secret)
+
+@app.route('/2fa-verify', methods=['GET', 'POST'])
+def two_factor_verify():
+    if not session.get('pending_2fa'):
+        return redirect(url_for('login'))
+    form = TwoFactorForm()
+    username = session.get('pending_2fa')
+    if form.validate_on_submit():
+        with sqlite3.connect('devices.db') as conn:
+            c = conn.cursor()
+            c.execute('SELECT totp_secret, role FROM users WHERE username = ?', (username,))
+            user = c.fetchone()
+            if not user:
+                flash('User not found', 'error')
+                return redirect(url_for('login'))
+            totp_secret, role = user
+            if totp_secret and pyotp.TOTP(totp_secret).verify(form.totp_code.data):
+                session['logged_in'] = True
+                session['username'] = username
+                session['role'] = role
+                session.pop('pending_2fa', None)
+                session.permanent = True
+                log_action(username, role, 'Login Success', '2FA verified')
+                return redirect(url_for('index', page='dashboard'))
+            flash('Invalid 2FA code', 'error')
+            log_action(username, role, 'Login Failed', 'Invalid 2FA code')
+    return render_template('2fa_verify.html', form=form)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -188,30 +269,41 @@ def login():
         password = request.form.get('password')
         with sqlite3.connect('devices.db') as conn:
             c = conn.cursor()
-            c.execute('SELECT password, role FROM users WHERE username = ?', (username,))
+            c.execute('SELECT password, role, totp_secret FROM users WHERE username = ?', (username,))
             user = c.fetchone()
             if user and bcrypt.check_password_hash(user[0], password):
+                if user[2]:  # totp_secret exists
+                    session['pending_2fa'] = username
+                    log_action(username, user[1], 'Login Attempt', 'Password verified, awaiting 2FA')
+                    return redirect(url_for('two_factor_verify'))
                 session['logged_in'] = True
                 session['username'] = username
                 session['role'] = user[1]
                 session.permanent = True
+                log_action(username, user[1], 'Login Success', 'Logged in without 2FA')
                 return redirect(url_for('index', page='dashboard'))
             flash('Invalid credentials', 'error')
+            log_action(username, 'Unknown', 'Login Failed', 'Invalid credentials')
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
+    username = session.get('username', 'Unknown')
+    role = session.get('role', 'Unknown')
     session.clear()
     flash('Logged out successfully', 'success')
+    log_action(username, role, 'Logout', 'User logged out')
     return redirect(url_for('login'))
 
 @app.route('/', defaults={'page': 'dashboard'})
 @app.route('/<page>')
 @role_required('Administrator', 'Approver', 'Contributor')
 def index(page):
-    if page not in ['dashboard', 'pending', 'devices', 'settings']:
+    if page not in ['dashboard', 'pending', 'devices', 'settings', 'audit_log']:
+        log_action(session.get('username'), session.get('role'), 'Invalid Page Access', f"Attempted access to {page}")
         abort(404)
-    if page == 'settings' and session.get('role') != 'Administrator':
+    if page in ['settings', 'audit_log'] and session.get('role') != 'Administrator':
+        log_action(session.get('username'), session.get('role'), 'Unauthorized Access', f"Attempted access to {page}")
         abort(403)
     
     with sqlite3.connect('devices.db') as conn:
@@ -226,6 +318,12 @@ def index(page):
             {"mac": row[0], "desc": row[1], "group": row[2]}
             for row in c.fetchall()
         ]
+        if page == 'audit_log':
+            c.execute('SELECT * FROM audit_log ORDER BY timestamp DESC')
+            logs = [
+                {"id": row[0], "timestamp": row[1], "username": row[2], "role": row[3], "action": row[4], "details": row[5]}
+                for row in c.fetchall()
+            ]
     
     enriched_devices = []
     for dev in pending_devices:
@@ -238,8 +336,9 @@ def index(page):
 
     authorize_form = AuthorizeDeviceForm()
     settings_form = SettingsForm()
+    log_action(session.get('username'), session.get('role'), 'Page Access', f"Viewed {page} page")
     return render_template('portal.html', page=page, devices=enriched_devices, mab_devices=mab_devices, 
-                           authorize_form=authorize_form, settings_form=settings_form)
+                           authorize_form=authorize_form, settings_form=settings_form, logs=logs if page == 'audit_log' else None)
 
 @app.route('/add-mab-device', methods=['GET', 'POST'])
 @role_required('Administrator', 'Contributor')
@@ -254,6 +353,7 @@ def add_device():
                       (mac, datetime.now().strftime("%Y-%m-%d %H:%M"), '10.45.18.1', 'Gi1/0/10'))
             conn.commit()
         flash('Device added successfully', 'success')
+        log_action(session.get('username'), session.get('role'), 'Add Device', f"Added device {mac}")
         return redirect(url_for('index', page='pending'))
     return render_template('add.html', form=form)
 
@@ -275,12 +375,16 @@ def authorize_device():
                 response = cisco_ise_api_authorize(mac, form.group.data)
                 if response['status'] == 'success':
                     flash(response['message'], 'success')
+                    log_action(session.get('username'), session.get('role'), 'Authorize Device', f"Authorized {mac} in group {form.group.data}")
                 else:
                     flash(response['message'], 'error')
+                    log_action(session.get('username'), session.get('role'), 'Authorize Device Failed', f"Failed to authorize {mac}: {response['message']}")
             else:
                 flash('Device not found', 'error')
+                log_action(session.get('username'), session.get('role'), 'Authorize Device Failed', f"Device {mac} not found")
         return redirect(url_for('index', page='devices'))
     flash('Invalid form data', 'error')
+    log_action(session.get('username'), session.get('role'), 'Authorize Device Failed', 'Invalid form data')
     return redirect(url_for('index', page='pending'))
 
 @app.route('/edit-device/<mac>', methods=['GET', 'POST'])
@@ -293,6 +397,7 @@ def edit_device(mac):
         c.execute('SELECT * FROM mab_devices WHERE mac = ?', (mac,))
         device = c.fetchone()
         if not device:
+            log_action(session.get('username'), session.get('role'), 'Edit Device Failed', f"Device {mac} not found")
             abort(404)
         if request.method == 'GET':
             form.mac.data = device[0]
@@ -304,6 +409,7 @@ def edit_device(mac):
                       (description, form.group.data, mac))
             conn.commit()
             flash('Device updated successfully', 'success')
+            log_action(session.get('username'), session.get('role'), 'Edit Device', f"Updated device {mac}")
             return redirect(url_for('index', page='devices'))
     return render_template('edit.html', form=form)
 
@@ -316,6 +422,7 @@ def delete_device(mac):
         c.execute('DELETE FROM mab_devices WHERE mac = ?', (mac,))
         conn.commit()
     flash('Device deleted successfully', 'success')
+    log_action(session.get('username'), session.get('role'), 'Delete Device', f"Deleted device {mac}")
     return redirect(url_for('index', page='devices'))
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -342,6 +449,7 @@ def settings():
                       ('ise_password', bcrypt.generate_password_hash(form.ise_password.data).decode('utf-8')))
             conn.commit()
             flash('Settings updated successfully', 'success')
+            log_action(session.get('username'), session.get('role'), 'Update Settings', 'Updated SNMP and ISE settings')
             return redirect(url_for('index', page='settings'))
     return render_template('settings.html', form=form)
 
@@ -356,12 +464,14 @@ def manage_users():
             c.execute('SELECT username FROM users WHERE username = ?', (username,))
             if c.fetchone():
                 flash('Username already exists', 'error')
+                log_action(session.get('username'), session.get('role'), 'Add User Failed', f"Username {username} already exists")
             else:
                 password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-                c.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-                          (username, password, form.role.data))
+                c.execute('INSERT INTO users (username, password, role, totp_secret) VALUES (?, ?, ?, ?)',
+                          (username, password, form.role.data, ''))
                 conn.commit()
                 flash(f'User {username} added successfully', 'success')
+                log_action(session.get('username'), session.get('role'), 'Add User', f"Added user {username} with role {form.role.data}")
             return redirect(url_for('manage_users'))
         c.execute('SELECT username, role FROM users')
         users = c.fetchall()
@@ -373,12 +483,14 @@ def delete_user(username):
     username = bleach.clean(username)
     if username == session.get('username'):
         flash('Cannot delete your own account', 'error')
+        log_action(session.get('username'), session.get('role'), 'Delete User Failed', 'Attempted to delete own account')
         return redirect(url_for('manage_users'))
     with sqlite3.connect('devices.db') as conn:
         c = conn.cursor()
         c.execute('DELETE FROM users WHERE username = ?', (username,))
         conn.commit()
     flash(f'User {username} deleted successfully', 'success')
+    log_action(session.get('username'), session.get('role'), 'Delete User', f"Deleted user {username}")
     return redirect(url_for('manage_users'))
 
 if __name__ == '__main__':
