@@ -152,7 +152,8 @@ def index(page):
             "location": info["location"]
         })
 
-    return render_template('portal.html', page=page, devices=enriched_devices, mab_devices=mab_devices)
+    authorize_form = AuthorizeDeviceForm()
+    return render_template('portal.html', page=page, devices=enriched_devices, mab_devices=mab_devices, authorize_form=authorize_form)
 
 @app.route('/add-mab-device', methods=['GET', 'POST'])
 @login_required
