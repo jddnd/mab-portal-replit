@@ -11,8 +11,7 @@
           <th>Switch</th>
           <th>Location</th>
           <th>Port</th>
-          <th>Assign Group</th>
-          <th>Action</th>
+          <th>Authorize</th>
         </tr>
       </thead>
       <tbody id="pending-devices">
@@ -24,20 +23,15 @@
           <td>{{ device.location }}</td>
           <td>{{ device.port }}</td>
           <td>
-<!-- Authorize Pending Devices (Add inside each row) -->
-<form method="POST" action="/authorize-device" onsubmit="return confirm('Authorize this device?');">
-  <input type="hidden" name="mac" value="{{ device.mac }}" />
-  <select name="group" required>
-    <option value="">-- Select Group --</option>
-    <option value="Printers">Printers</option>
-    <option value="IoT_Meeting">IoT_Meeting</option>
-    <option value="Mgmt_AP">Mgmt_AP</option>
-    <option value="Mgmt_SW">Mgmt_SW</option>
-  </select>
-</form>
-
-          </td>
-          <td>
+            <form method="POST" action="/authorize-device" onsubmit="return confirm('Authorize this device?');">
+              <input type="hidden" name="mac" value="{{ device.mac }}" />
+              <select name="group" required>
+                <option value="">-- Select Group --</option>
+                <option value="Printers">Printers</option>
+                <option value="IoT_Meeting">IoT_Meeting</option>
+                <option value="Mgmt_AP">Mgmt_AP</option>
+                <option value="Mgmt_SW">Mgmt_SW</option>
+              </select>
               <button type="submit">Authorize</button>
             </form>
           </td>
@@ -48,52 +42,52 @@
   </div>
 
   <div class="section">
-   <h2>Manually Add New Device</h2>
-<form method="POST" action="/add-mab-device" onsubmit="return validateManualForm();">
-  <label for="mac">MAC Address</label>
-  <input type="text" id="mac" name="mac"
-         pattern="^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
-         title="Enter a valid MAC address (e.g. AA:BB:CC:DD:EE:FF)"
-         placeholder="e.g. AA:BB:CC:DD:EE:FF" required />
+    <h2>Manually Add New Device</h2>
+    <form method="POST" action="/add-mab-device" onsubmit="return validateManualForm();">
+      <label for="mac">MAC Address</label>
+      <input type="text" id="mac" name="mac"
+             pattern="^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+             title="Enter a valid MAC address (e.g. AA:BB:CC:DD:EE:FF)"
+             placeholder="e.g. AA:BB:CC:DD:EE:FF" required />
 
-  <label for="desc">Description</label>
-  <input type="text" id="desc" name="desc" minlength="3"
-         placeholder="e.g. Printer HR DK-02" required />
+      <label for="desc">Description</label>
+      <input type="text" id="desc" name="desc" minlength="3"
+             placeholder="e.g. Printer HR DK-02" required />
 
-  <label for="group">Device Group</label>
-  <select id="group" name="group" required>
-    <option value="">-- Select Group --</option>
-    <option value="Printers">Printers</option>
-    <option value="IoT_Meeting">IoT_Meeting</option>
-    <option value="Mgmt_AP">Mgmt_AP</option>
-    <option value="Mgmt_SW">Mgmt_SW</option>
-  </select>
+      <label for="group">Device Group</label>
+      <select id="group" name="group" required>
+        <option value="">-- Select Group --</option>
+        <option value="Printers">Printers</option>
+        <option value="IoT_Meeting">IoT_Meeting</option>
+        <option value="Mgmt_AP">Mgmt_AP</option>
+        <option value="Mgmt_SW">Mgmt_SW</option>
+      </select>
 
-  <button type="submit">Submit Device</button>
-</form>
+      <button type="submit">Submit Device</button>
+    </form>
     <script>
-  function validateManualForm() {
-    const mac = document.getElementById('mac').value.trim();
-    const desc = document.getElementById('desc').value.trim();
-    const group = document.getElementById('group').value;
+      function validateManualForm() {
+        const mac = document.getElementById('mac').value.trim();
+        const desc = document.getElementById('desc').value.trim();
+        const group = document.getElementById('group').value;
 
-    const macRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
-    if (!macRegex.test(mac)) {
-      alert("Please enter a valid MAC address.");
-      return false;
-    }
-    if (desc.length < 3) {
-      alert("Description must be at least 3 characters.");
-      return false;
-    }
-    if (!group) {
-      alert("Please select a group.");
-      return false;
-    }
+        const macRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+        if (!macRegex.test(mac)) {
+          alert("Please enter a valid MAC address.");
+          return false;
+        }
+        if (desc.length < 3) {
+          alert("Description must be at least 3 characters.");
+          return false;
+        }
+        if (!group) {
+          alert("Please select a group.");
+          return false;
+        }
 
-    return confirm("Are you sure you want to add this device?");
-  }
-</script>
+        return confirm("Are you sure you want to add this device?");
+      }
+    </script>
   </div>
 
   <div class="footer">Cisco ISE Device Portal • Internal IT Access Only • Logged & Secured</div>
