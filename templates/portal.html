@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <div class="section">
+    <h2>Pending Devices for Authorization</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>MAC Address</th>
+          <th>Seen On</th>
+          <th>Switch</th>
+          <th>Location</th>
+          <th>Port</th>
+          <th>Assign Group</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="pending-devices">
+        {% for device in devices %}
+        <tr>
+          <td>{{ device.mac }}</td>
+          <td>{{ device.seen }}</td>
+          <td>{{ device.switch }}</td>
+          <td>{{ device.location }}</td>
+          <td>{{ device.port }}</td>
+          <td>
+            <form method="POST" action="/authorize-device">
+              <input type="hidden" name="mac" value="{{ device.mac }}" />
+              <select name="group">
+                <option value="Printers">Printers</option>
+                <option value="IoT_Meeting">IoT_Meeting</option>
+                <option value="Mgmt_AP">Mgmt_AP</option>
+                <option value="Mgmt_SW">Mgmt_SW</option>
+              </select>
+          </td>
+          <td>
+              <button type="submit">Authorize</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Manually Add New Device</h2>
+    <form method="POST" action="/add-mab-device">
+      <label for="mac">MAC Address</label>
+      <input type="text" id="mac" name="mac" placeholder="e.g. AA:BB:CC:DD:EE:FF" required />
+
+      <label for="desc">Description</label>
+      <input type="text" id="desc" name="desc" placeholder="e.g. Printer HR DK-02" required />
+
+      <label for="group">Device Group</label>
+      <select id="group" name="group" required>
+        <option value="">-- Select Group --</option>
+        <option value="Printers">Printers</option>
+        <option value="IoT_Meeting">IoT_Meeting</option>
+        <option value="Mgmt_AP">Mgmt_AP</option>
+        <option value="Mgmt_SW">Mgmt_SW</option>
+      </select>
+
+      <button type="submit">Submit Device</button>
+    </form>
+  </div>
+
+  <div class="footer">Cisco ISE Device Portal • Internal IT Access Only • Logged & Secured</div>
+</div>
+{% endblock %}
