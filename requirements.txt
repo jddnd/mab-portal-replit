@@ -1,3 +1,4 @@
 flask
 pysnmp
 flask-wtf
+wtforms
