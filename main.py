@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, SubmitField, PasswordField
+from wtforms import StringField, SelectField, SubmitField, PasswordField, BooleanField
 from wtforms.validators import DataRequired, Regexp, Length, ValidationError
 from datetime import datetime
 import sqlite3
@@ -203,6 +203,10 @@ class TwoFactorForm(FlaskForm):
     totp_code = StringField('2FA Code', validators=[DataRequired(), Length(min=6, max=6)])
     submit = SubmitField('Verify')
 
+class TwoFactorSetupForm(FlaskForm):
+    enable_2fa = BooleanField('Enable Two-Factor Authentication')
+    submit = SubmitField('Save 2FA Settings')
+
 # RBAC decorator
 def role_required(*roles):
     def decorator(f):
@@ -225,29 +229,41 @@ def two_factor_setup():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     username = session.get('username')
+    form = TwoFactorSetupForm()
     with sqlite3.connect('devices.db') as conn:
         c = conn.cursor()
         c.execute('SELECT totp_secret FROM users WHERE username = ?', (username,))
         totp_secret = c.fetchone()[0]
     
-    if not totp_secret:
-        totp_secret = pyotp.random_base32()
-        c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', (totp_secret, username))
-        conn.commit()
+    qr_code = None
+    new_totp_secret = totp_secret
+    if form.validate_on_submit():
+        if form.enable_2fa.data:
+            if not totp_secret:  # Generate new secret only if 2FA is being enabled
+                new_totp_secret = pyotp.random_base32()
+                c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', (new_totp_secret, username))
+                conn.commit()
+                log_action(username, session.get('role'), '2FA Enabled', 'Enabled 2FA and generated new TOTP secret')
+        else:
+            c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', ('', username))
+            conn.commit()
+            new_totp_secret = ''
+            log_action(username, session.get('role'), '2FA Disabled', 'Disabled 2FA')
+        flash('2FA settings updated successfully', 'success')
+        return redirect(url_for('two_factor_setup'))
     
-    totp = pyotp.TOTP(totp_secret)
-    qr_uri = totp.provisioning_uri(name=username, issuer_name='Cisco ISE Device Portal')
+    if new_totp_secret:
+        totp = pyotp.TOTP(new_totp_secret)
+        qr_uri = totp.provisioning_uri(name=username, issuer_name='Cisco ISE Device Portal')
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(qr_uri)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        qr_code = base64.b64encode(buffer.getvalue()).decode('utf-8')
     
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(qr_uri)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    qr_code = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    
-    log_action(username, session.get('role'), '2FA Setup', 'Generated 2FA QR code')
-    return render_template('2fa_setup.html', qr_code=qr_code, totp_secret=totp_secret)
+    return render_template('2fa_setup.html', form=form, qr_code=qr_code, totp_secret=new_totp_secret)
 
 @app.route('/2fa-verify', methods=['GET', 'POST'])
 def two_factor_verify():
@@ -502,9 +518,30 @@ def manage_users():
                 flash(f'User {username} added successfully', 'success')
                 log_action(session.get('username'), session.get('role'), 'Add User', f"Added user {username} with role {form.role.data}")
             return redirect(url_for('manage_users'))
-        c.execute('SELECT username, role FROM users')
-        users = c.fetchall()
+        c.execute('SELECT username, role, totp_secret FROM users')
+        users = [(row[0], row[1], bool(row[2])) for row in c.fetchall()]
     return render_template('manage_users.html', form=form, users=users)
+
+@app.route('/disable-2fa/<username>', methods=['POST'])
+@role_required('Administrator')
+def disable_2fa(username):
+    username = bleach.clean(username)
+    if username == session.get('username'):
+        flash('Cannot disable 2FA for your own account', 'error')
+        log_action(session.get('username'), session.get('role'), 'Disable 2FA Failed', 'Attempted to disable own 2FA')
+        return redirect(url_for('manage_users'))
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('SELECT username FROM users WHERE username = ?', (username,))
+        if not c.fetchone():
+            flash(f'User {username} not found', 'error')
+            log_action(session.get('username'), session.get('role'), 'Disable 2FA Failed', f"User {username} not found")
+            return redirect(url_for('manage_users'))
+        c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', ('', username))
+        conn.commit()
+    flash(f'2FA disabled for user {username}', 'success')
+    log_action(session.get('username'), session.get('role'), 'Disable 2FA', f"Disabled 2FA for user {username}")
+    return redirect(url_for('manage_users'))
 
 @app.route('/delete-user/<username>', methods=['POST'])
 @role_required('Administrator')
