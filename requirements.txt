@@ -1,7 +1,0 @@
-flask
-pysnmp
-flawsk-wtf
-wtforms
-flask-bcrypt
-bleach
-requests
