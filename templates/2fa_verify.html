@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto">
+    <h2 class="text-xl font-semibold mb-4">Verify 2FA Code</h2>
+    <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div>
+            <label class="block text-sm font-medium text-gray-700">2FA Code</label>
+            {{ form.totp_code(class="mt-1 p-2 w-full border rounded-md") }}
+            {% if form.totp_code.errors %}
+                <p class="text-red-500 text-sm">{{ form.totp_code.errors[0] }}</p>
+            {% endif %}
+        </div>
+        {{ form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 w-full") }}
+    </form>
+</div>
+{% endblock %}
