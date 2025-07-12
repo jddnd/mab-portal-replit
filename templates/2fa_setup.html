@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto">
+    <h2 class="text-xl font-semibold mb-4">2FA Setup</h2>
+    <p class="mb-4">Scan the QR code below with your authenticator app (e.g., Google Authenticator) or enter the secret manually:</p>
+    <img src="data:image/png;base64,{{ qr_code }}" alt="2FA QR Code" class="mb-4">
+    <p class="mb-4"><strong>Secret:</strong> {{ totp_secret }}</p>
+    <p class="text-sm text-gray-600">Save this secret securely. You’ll need to enter a 6-digit code from your authenticator app when logging in.</p>
+    <a href="{{ url_for('index', page='dashboard') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-4 inline-block">Back to Dashboard</a>
+</div>
+{% endblock %}
