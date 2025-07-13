@@ -4,23 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cisco ISE Device Portal</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
-<body class="bg-gray-800 text-white min-h-screen">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flashed-message {{ category == 'error' and 'error' or 'success' }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-    <footer class="text-center text-gray-400 mt-8 pb-4">
-        Cisco ISE Device Portal © 2024
-
 <body class="bg-gray-900 text-white font-sans">
     <div class="container mx-auto p-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -32,11 +17,10 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-      
+        {% block content %}{% endblock %}
     </div>
     <footer class="text-center py-6 text-gray-400">
         Cisco ISE Device Portal &copy; 2024
-
     </footer>
 </body>
 </html>
