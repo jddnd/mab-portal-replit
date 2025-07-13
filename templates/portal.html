@@ -142,12 +142,18 @@
                     <td class="p-4">{{ device.location }}</td>
                     <td class="p-4">{{ device.port }}</td>
                     <td class="p-4 text-right">
-                        <form method="POST" action="{{ url_for('authorize_device') }}" class="flex items-center justify-end space-x-2">
+
+                        <form method="POST" action="{{ url_for('authorize_device') }}" class="inline-flex items-center space-x-2">
                             {{ authorize_form.hidden_tag() }}
                             <input type="hidden" name="mac" value="{{ device.mac }}">
                             {{ authorize_form.group(class="bg-gray-900 border border-gray-600 rounded-md p-2") }}
-                            {{ authorize_form.submit(class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md transition-colors duration-300") }}
+                            <button type="submit" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md transition-colors duration-300">Authorize</button>
                         </form>
+                        <form method="POST" action="{{ url_for('reject_device') }}" class="inline-flex items-center ml-2">
+                            <input type="hidden" name="mac" value="{{ device.mac }}">
+                            <button type="submit" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md transition-colors duration-300" onclick="return confirm('Are you sure you want to reject and remove this device?')">Reject</button>
+
+                       
                     </td>
                 </tr>
                 {% endfor %}

@@ -446,9 +446,21 @@ def authorize_device():
             else:
                 flash('Device not found', 'error')
                 log_action(session.get('username'), session.get('role'), 'Authorize Device Failed', f"Device {mac} not found")
-        return redirect(url_for('index', page='devices'))
+        return redirect(url_for('index', page='pending'))
     flash('Invalid form data', 'error')
     log_action(session.get('username'), session.get('role'), 'Authorize Device Failed', 'Invalid form data')
+    return redirect(url_for('index', page='pending'))
+
+@app.route('/reject-device', methods=['POST'])
+@role_required('Administrator', 'Approver')
+def reject_device():
+    mac = bleach.clean(request.form.get('mac'))
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM pending_devices WHERE mac = ?', (mac,))
+        conn.commit()
+    flash(f'Device {mac} has been rejected and removed.', 'success')
+    log_action(session.get('username'), session.get('role'), 'Reject Device', f"Rejected and removed device {mac}")
     return redirect(url_for('index', page='pending'))
 
 @app.route('/edit-device/<mac>', methods=['GET', 'POST'])
