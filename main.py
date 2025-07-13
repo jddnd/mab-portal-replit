@@ -48,6 +48,11 @@ def init_db():
                      (key TEXT PRIMARY KEY, value TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS audit_log
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, username TEXT, role TEXT, action TEXT, details TEXT)''')
+        # Add assigned_user column if it doesn't exist
+        c.execute('PRAGMA table_info(mab_devices)')
+        columns = [row[1] for row in c.fetchall()]
+        if 'assigned_user' not in columns:
+            c.execute('ALTER TABLE mab_devices ADD COLUMN assigned_user TEXT')
         # Insert initial data
         c.execute('INSERT OR IGNORE INTO pending_devices (mac, seen, switch_ip, port) VALUES (?, ?, ?, ?)',
                   ('AA:BB:CC:DD:EE:FF', '2025-07-12 09:32', '10.45.18.1', 'Gi1/0/10'))
@@ -430,8 +435,8 @@ def authorize_device():
             c.execute('SELECT * FROM pending_devices WHERE mac = ?', (mac,))
             device = c.fetchone()
             if device:
-                c.execute('INSERT INTO mab_devices (mac, description, group_name) VALUES (?, ?, ?)',
-                          (mac, 'Authorized Device', form.group.data))
+                c.execute('INSERT INTO mab_devices (mac, description, group_name, assigned_user) VALUES (?, ?, ?, ?)',
+                          (mac, 'Authorized Device', form.group.data, session.get('username')))
                 c.execute('DELETE FROM pending_devices WHERE mac = ?', (mac,))
                 conn.commit()
                 response = cisco_ise_api_authorize(mac, form.group.data)
@@ -479,7 +484,7 @@ def edit_device(mac):
             form.mac.data = device[0]
             form.description.data = device[1]
             form.group.data = device[2]
-            form.assigned_user.data = device[3]
+            form.assigned_user.data = device[3] if device[3] else ""
 
     return render_template('edit.html', form=form)
 
