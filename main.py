@@ -157,8 +157,8 @@ def password_complexity(form, field):
 # Forms
 class AddDeviceForm(FlaskForm):
     mac = StringField('MAC Address', validators=[
-        DataRequired(), 
-        Regexp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', message="Invalid MAC address")
+        DataRequired(),
+        Regexp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', message="Invalid MAC address format")
     ])
     description = StringField('Description', validators=[DataRequired(), Length(min=3)])
     group = SelectField('Group', choices=[
