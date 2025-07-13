@@ -117,21 +117,21 @@ def cisco_ise_api_authorize(mac, group):
 
 # SNMP function
 def get_snmp_sysinfo(ip):
-    with sqlite3.connect('devices.db') as conn:
-        c = conn.cursor()
-        c.execute('SELECT value FROM settings WHERE key = ?', ('snmp_community',))
-        community = c.fetchone()[0] or 'public'
+    try:
+        with sqlite3.connect('devices.db') as conn:
+            c = conn.cursor()
+            c.execute('SELECT value FROM settings WHERE key = ?', ('snmp_community',))
+            community = c.fetchone()[0] or 'public'
 
-    sys_name_oid = '1.3.6.1.2.1.1.5.0'
-    sys_location_oid = '1.3.6.1.2.1.1.6.0'
-    result = {'name': 'Unknown', 'location': 'Unknown'}
+        sys_name_oid = '1.3.6.1.2.1.1.5.0'
+        sys_location_oid = '1.3.6.1.2.1.1.6.0'
+        result = {'name': 'SNMP Error', 'location': 'SNMP Error'}
 
-    for oid, key in [(sys_name_oid, 'name'), (sys_location_oid, 'location')]:
-        try:
+        for oid, key in [(sys_name_oid, 'name'), (sys_location_oid, 'location')]:
             iterator = getCmd(
                 SnmpEngine(),
                 CommunityData(community, mpModel=1),
-                UdpTransportTarget((ip, 161), timeout=3, retries=2),
+                UdpTransportTarget((ip, 161), timeout=1, retries=1),
                 ContextData(),
                 ObjectType(ObjectIdentity(oid))
             )
@@ -139,8 +139,10 @@ def get_snmp_sysinfo(ip):
             if not errorIndication and not errorStatus:
                 for varBind in varBinds:
                     result[key] = str(varBind[1])
-        except Exception as e:
-            logger.error(f"SNMP error for {ip}: {e}")
+            else:
+                logger.error(f"SNMP error for {ip} ({key}): {errorIndication or errorStatus.prettyPrint()}")
+    except Exception as e:
+        logger.error(f"Fatal SNMP error for {ip}: {e}")
     return result
 
 # Password complexity validator
@@ -484,7 +486,11 @@ def edit_device(mac):
             form.mac.data = device[0]
             form.description.data = device[1]
             form.group.data = device[2]
+
             form.assigned_user.data = device[3] if device[3] else ""  # Resolved conflict: Use main branch's safer logic
+
+            form.assigned_user.data = device[3]
+
 
     return render_template('edit.html', form=form)
 
@@ -612,6 +618,7 @@ def export_devices():
 @role_required('Administrator')
 def import_devices():
     if 'file' not in request.files:
+ 
         flash('No file part', 'error')
         return redirect(url_for('index', page='devices'))
     file = request.files['file']
@@ -647,6 +654,49 @@ def import_devices():
     else:
         flash('Invalid file type. Please upload a CSV file.', 'error')
         return redirect(url_for('index', page='devices'))
+
+
+        flash('No file part. Please select a file to upload.', 'error')
+        return redirect(url_for('index', page='devices'))
+    file = request.files['file']
+    if file.filename == '':
+        flash('No selected file. Please choose a file to import.', 'error')
+        return redirect(url_for('index', page='devices'))
+    if not file.filename.endswith('.csv'):
+        flash('Invalid file type. Only CSV files are allowed.', 'error')
+        return redirect(url_for('index', page='devices'))
+
+    try:
+        stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = csv.reader(stream)
+        header = next(csv_input)
+        if header != ['mac', 'description', 'group_name', 'assigned_user']:
+            flash('CSV file has incorrect headers. Expected: mac, description, group_name, assigned_user', 'error')
+            return redirect(url_for('index', page='devices'))
+
+        with sqlite3.connect('devices.db') as conn:
+            c = conn.cursor()
+            imported_count = 0
+            for row in csv_input:
+                mac, description, group_name, assigned_user = row
+                mac = bleach.clean(mac).strip()
+                description = bleach.clean(description).strip()
+                group_name = bleach.clean(group_name).strip()
+                assigned_user = bleach.clean(assigned_user).strip() or None
+
+                if re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', mac):
+                    c.execute('INSERT OR REPLACE INTO mab_devices (mac, description, group_name, assigned_user) VALUES (?, ?, ?, ?)',
+                              (mac, description, group_name, assigned_user))
+                    imported_count += 1
+            conn.commit()
+        flash(f'Successfully imported {imported_count} devices.', 'success')
+        log_action(session.get('username'), session.get('role'), 'Import Devices', f"Imported {imported_count} devices from CSV")
+    except Exception as e:
+        flash(f'An error occurred during import: {e}', 'error')
+        log_action(session.get('username'), session.get('role'), 'Import Devices Failed', f"Error: {e}")
+
+    return redirect(url_for('index', page='devices'))
+
 
 if __name__ == '__main__':
     init_db()

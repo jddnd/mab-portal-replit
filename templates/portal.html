@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+ main
 <nav class="bg-gray-800/50 p-4 mb-8 rounded-lg shadow-lg">
     <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
@@ -17,11 +18,31 @@
         </div>
         <div>
             <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md">Logout</a>
+
+<nav class="bg-gray-800/50 backdrop-blur-lg text-white p-4 mb-8 rounded-lg shadow-lg">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('index', page='dashboard') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'dashboard' else '' }}">Dashboard</a>
+            {% if session['role'] in ['Administrator', 'Approver'] %}
+                <a href="{{ url_for('index', page='pending') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'pending' else '' }}">Pending</a>
+            {% endif %}
+            {% if session['role'] == 'Administrator' %}
+                <a href="{{ url_for('index', page='devices') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'devices' else '' }}">Devices</a>
+                <a href="{{ url_for('settings') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'settings' else '' }}">Settings</a>
+                <a href="{{ url_for('manage_users') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300">Manage Users</a>
+                <a href="{{ url_for('index', page='audit_log') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'audit_log' else '' }}">Audit Log</a>
+            {% endif %}
+            <a href="{{ url_for('two_factor_setup') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300">2FA Setup</a>
+        </div>
+        <div>
+            <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md transition-colors duration-300">Logout</a>
+
         </div>
     </div>
 </nav>
 
 {% if page == 'dashboard' %}
+
 <div class="p-8 rounded-lg shadow-lg">
     <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
     <p class="mb-8">System status and key metrics</p>
@@ -31,11 +52,23 @@
             <p class="text-4xl font-bold">{{ chart_data.pending_count }}</p>
         </div>
         <div class="p-6 rounded-lg">
+=======
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
+    <p class="text-gray-400 mb-8">System status and key metrics</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-2">Pending Devices</h3>
+            <p class="text-4xl font-bold">{{ chart_data.pending_count }}</p>
+        </div>
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+
             <h3 class="text-xl font-semibold mb-2">Authorized Devices</h3>
             <p class="text-4xl font-bold">{{ chart_data.authorized_count }}</p>
         </div>
     </div>
     <div class="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+
         <div class="p-6 rounded-lg">
             <h3 class="text-xl font-semibold mb-4">Device Status</h3>
             <canvas id="deviceStatusChart"></canvas>
@@ -52,6 +85,20 @@
     <div class="mt-6">
         <h3 class="text-lg font-medium mb-4">Devices Per User</h3>
         <canvas id="userDeviceChart" class="w-full max-w-md mx-auto"></canvas>
+
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-4">Device Status</h3>
+            <canvas id="deviceStatusChart"></canvas>
+        </div>
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-4">Device Groups</h3>
+            <canvas id="groupDistributionChart"></canvas>
+        </div>
+        <div class="bg-gray-700/50 p-6 rounded-lg col-span-1 lg:col-span-2">
+            <h3 class="text-xl font-semibold mb-4">Devices Per User</h3>
+            <canvas id="userDeviceChart"></canvas>
+        </div>
+
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -107,18 +154,27 @@
             datasets: [{
                 label: 'Number of Devices',
                 data: {{ chart_data.user_counts | tojson }},
+
                 backgroundColor: '#FF9800',
                 borderColor: '#F57C00',
+
+                backgroundColor: '#ed8936',
+                borderColor: '#dd6b20',
+
                 borderWidth: 1
             }]
         },
         options: {
             scales: {
+
                 y: {
                     beginAtZero: true,
                     title: { display: true, text: 'Number of Devices' }
                 },
                 x: { title: { display: true, text: 'Username' } }
+=======
+                y: { beginAtZero: true, grid: { color: '#4a5568' } },
+                x: { grid: { color: '#4a5568' } }
             },
             plugins: { legend: { display: false } }
         }
@@ -126,6 +182,7 @@
 </script>
 
 {% elif page == 'pending' and session['role'] in ['Administrator', 'Approver'] %}
+
 <div class="p-6 rounded-lg shadow-md">
     <h2 class="text-xl font-semibold mb-4">Pending Devices</h2>
     <table class="table-auto">
@@ -202,6 +259,89 @@
         </tbody>
     </table>
     <a href="{{ url_for('add_device') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-4 inline-block">Add New Device</a>
+
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold mb-6">Pending Devices</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="p-4">MAC Address</th>
+                    <th class="p-4">Seen On</th>
+                    <th class="p-4">Switch</th>
+                    <th class="p-4">Location</th>
+                    <th class="p-4">Port</th>
+                    <th class="p-4 text-right">Authorize</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in devices %}
+                <tr class="border-b border-gray-700 hover:bg-gray-700/50 transition-colors duration-300">
+                    <td class="p-4">{{ device.mac }}</td>
+                    <td class="p-4">{{ device.seen }}</td>
+                    <td class="p-4">{{ device.switch }}</td>
+                    <td class="p-4">{{ device.location }}</td>
+                    <td class="p-4">{{ device.port }}</td>
+                    <td class="p-4 text-right">
+                        <form method="POST" action="{{ url_for('authorize_device') }}" class="flex items-center justify-end space-x-2">
+                            {{ authorize_form.hidden_tag() }}
+                            <input type="hidden" name="mac" value="{{ device.mac }}">
+                            {{ authorize_form.group(class="bg-gray-900 border border-gray-600 rounded-md p-2") }}
+                            {{ authorize_form.submit(class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md transition-colors duration-300") }}
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="mt-8">
+        <a href="{{ url_for('add_device') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-md transition-colors duration-300">Manually Add Device</a>
+    </div>
+</div>
+
+{% elif page == 'devices' and session['role'] == 'Administrator' %}
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-3xl font-bold">All MAB Devices</h2>
+        <div class="flex space-x-4">
+            <a href="{{ url_for('export_devices') }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors duration-300">Export CSV</a>
+            <button onclick="document.getElementById('import-dialog').showModal()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors duration-300">Import CSV</button>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="p-4">MAC Address</th>
+                    <th class="p-4">Description</th>
+                    <th class="p-4">Group</th>
+                    <th class="p-4">Assigned User</th>
+                    <th class="p-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in mab_devices %}
+                <tr class="border-b border-gray-700 hover:bg-gray-700/50 transition-colors duration-300">
+                    <td class="p-4">{{ device.mac }}</td>
+                    <td class="p-4">{{ device.desc }}</td>
+                    <td class="p-4">{{ device.group }}</td>
+                    <td class="p-4">{{ device.assigned_user or 'N/A' }}</td>
+                    <td class="p-4 text-right">
+                        <a href="{{ url_for('edit_device', mac=device.mac) }}" class="text-blue-400 hover:text-blue-300 mr-4">Edit</a>
+                        <form method="POST" action="{{ url_for('delete_device', mac=device.mac) }}" class="inline">
+                            <button type="submit" class="text-red-400 hover:text-red-300" onclick="return confirm('Are you sure you want to delete this device?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="mt-8">
+        <a href="{{ url_for('add_device') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-md transition-colors duration-300">Add New Device</a>
+    </div>
+
 </div>
 <dialog id="import-dialog" class="p-6 rounded-lg shadow-xl">
     <h3 class="text-lg font-semibold mb-4">Import Devices from CSV</h3>
@@ -210,6 +350,17 @@
         <div class="flex justify-end space-x-2">
             <button type="button" onclick="document.getElementById('import-dialog').close()" class="bg-gray-300 px-4 py-2 rounded-md">Cancel</button>
             <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">Import</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="import-dialog" class="bg-gray-800 text-white p-8 rounded-lg shadow-lg">
+    <h3 class="text-2xl font-bold mb-6">Import Devices from CSV</h3>
+    <form method="POST" action="{{ url_for('import_devices') }}" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" class="mb-6 bg-gray-700 p-2 rounded-md">
+        <div class="flex justify-end space-x-4">
+            <button type="button" onclick="document.getElementById('import-dialog').close()" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-md transition-colors duration-300">Cancel</button>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-md transition-colors duration-300">Import</button>
         </div>
     </form>
 </dialog>
