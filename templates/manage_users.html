@@ -1,61 +1,63 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="bg-white p-6 rounded-lg shadow-md">
-    <h2 class="text-xl font-semibold mb-4">Manage Users</h2>
-    <form method="POST" class="space-y-4 mb-6">
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold mb-6">Manage Users</h2>
+    <form method="POST" class="space-y-6 mb-8">
         {{ form.hidden_tag() }}
         <div>
-            <label class="block text-sm font-medium text-gray-700">Username</label>
-            {{ form.username(class="mt-1 p-2 w-full border rounded-md") }}
+            <label class="block text-sm font-medium text-gray-400">Username</label>
+            {{ form.username(class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% if form.username.errors %}
-                <p class="text-red-500 text-sm">{{ form.username.errors[0] }}</p>
+                <p class="text-red-400 text-sm mt-1">{{ form.username.errors[0] }}</p>
             {% endif %}
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Password</label>
-            {{ form.password(class="mt-1 p-2 w-full border rounded-md") }}
+            <label class="block text-sm font-medium text-gray-400">Password</label>
+            {{ form.password(class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% if form.password.errors %}
-                <p class="text-red-500 text-sm">{{ form.password.errors[0] }}</p>
+                <p class="text-red-400 text-sm mt-1">{{ form.password.errors[0] }}</p>
             {% endif %}
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Role</label>
-            {{ form.role(class="mt-1 p-2 w-full border rounded-md") }}
+            <label class="block text-sm font-medium text-gray-400">Role</label>
+            {{ form.role(class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% if form.role.errors %}
-                <p class="text-red-500 text-sm">{{ form.role.errors[0] }}</p>
+                <p class="text-red-400 text-sm mt-1">{{ form.role.errors[0] }}</p>
             {% endif %}
         </div>
-        {{ form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600") }}
+        {{ form.submit(class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-md transition-colors duration-300 font-semibold") }}
     </form>
-    <h3 class="text-lg font-medium mb-4">Current Users</h3>
-    <table class="w-full table-fixed border-collapse">
-        <thead>
-            <tr class="bg-gray-200">
-                <th class="px-4 py-2 text-left min-w-[150px]">Username</th>
-                <th class="px-4 py-2 text-left min-w-[120px]">Role</th>
-                <th class="px-4 py-2 text-left min-w-[100px]">2FA Status</th>
-                <th class="px-4 py-2 text-left min-w-[200px]">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr class="border-t">
-                <td class="px-4 py-2">{{ user[0] }}</td>
-                <td class="px-4 py-2">{{ user[1] }}</td>
-                <td class="px-4 py-2">{{ user[2] | ternary('Enabled', 'Disabled') }}</td>
-                <td class="px-4 py-2">
-                    {% if user[2] %}
-                        <form method="POST" action="{{ url_for('disable_2fa', username=user[0]) }}" class="inline">
-                            <button type="submit" class="text-yellow-500 hover:underline" onclick="return confirm('Are you sure you want to disable 2FA for {{ user[0] }}?')">Disable 2FA</button>
+    <h3 class="text-2xl font-bold mb-6">Current Users</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="p-4">Username</th>
+                    <th class="p-4">Role</th>
+                    <th class="p-4">2FA Status</th>
+                    <th class="p-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="border-b border-gray-700 hover:bg-gray-700/50 transition-colors duration-300">
+                    <td class="p-4">{{ user[0] }}</td>
+                    <td class="p-4">{{ user[1] }}</td>
+                    <td class="p-4">{{ user[2] | ternary('Enabled', 'Disabled') }}</td>
+                    <td class="p-4 text-right">
+                        {% if user[2] %}
+                            <form method="POST" action="{{ url_for('disable_2fa', username=user[0]) }}" class="inline">
+                                <button type="submit" class="text-yellow-400 hover:text-yellow-300 mr-4" onclick="return confirm('Are you sure you want to disable 2FA for {{ user[0] }}?')">Disable 2FA</button>
+                            </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('delete_user', username=user[0]) }}" class="inline">
+                            <button type="submit" class="text-red-400 hover:text-red-300" onclick="return confirm('Are you sure you want to delete {{ user[0] }}?')">Delete</button>
                         </form>
-                    {% endif %}
-                    <form method="POST" action="{{ url_for('delete_user', username=user[0]) }}" class="inline">
-                        <button type="submit" class="text-red-500 hover:underline ml-4" onclick="return confirm('Are you sure you want to delete {{ user[0] }}?')">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

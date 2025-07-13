@@ -251,30 +251,32 @@
 </div>
 
 {% elif page == 'audit_log' and session['role'] == 'Administrator' %}
-<div class="bg-white p-6 rounded-lg shadow-md">
-    <h2 class="text-xl font-semibold mb-4">Audit Log</h2>
-    <table class="w-full table-auto">
-        <thead>
-            <tr class="bg-gray-200">
-                <th class="px-4 py-2">Timestamp</th>
-                <th class="px-4 py-2">Username</th>
-                <th class="px-4 py-2">Role</th>
-                <th class="px-4 py-2">Action</th>
-                <th class="px-4 py-2">Details</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in logs %}
-            <tr class="border-t">
-                <td class="px-4 py-2">{{ log.timestamp }}</td>
-                <td class="px-4 py-2">{{ log.username }}</td>
-                <td class="px-4 py-2">{{ log.role }}</td>
-                <td class="px-4 py-2">{{ log.action }}</td>
-                <td class="px-4 py-2">{{ log.details }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold mb-6">Audit Log</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="p-4">Timestamp</th>
+                    <th class="p-4">Username</th>
+                    <th class="p-4">Role</th>
+                    <th class="p-4">Action</th>
+                    <th class="p-4">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr class="border-b border-gray-700 hover:bg-gray-700/50 transition-colors duration-300">
+                    <td class="p-4">{{ log.timestamp }}</td>
+                    <td class="p-4">{{ log.username }}</td>
+                    <td class="p-4">{{ log.role }}</td>
+                    <td class="p-4">{{ log.action }}</td>
+                    <td class="p-4">{{ log.details }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
 {% endblock %}
