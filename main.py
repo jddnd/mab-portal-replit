@@ -48,11 +48,6 @@ def init_db():
                      (key TEXT PRIMARY KEY, value TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS audit_log
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, username TEXT, role TEXT, action TEXT, details TEXT)''')
-        # Add assigned_user column if it doesn't exist
-        c.execute('PRAGMA table_info(mab_devices)')
-        columns = [row[1] for row in c.fetchall()]
-        if 'assigned_user' not in columns:
-            c.execute('ALTER TABLE mab_devices ADD COLUMN assigned_user TEXT')
         # Insert initial data
         c.execute('INSERT OR IGNORE INTO pending_devices (mac, seen, switch_ip, port) VALUES (?, ?, ?, ?)',
                   ('AA:BB:CC:DD:EE:FF', '2025-07-12 09:32', '10.45.18.1', 'Gi1/0/10'))
@@ -437,8 +432,8 @@ def authorize_device():
             c.execute('SELECT * FROM pending_devices WHERE mac = ?', (mac,))
             device = c.fetchone()
             if device:
-                c.execute('INSERT INTO mab_devices (mac, description, group_name, assigned_user) VALUES (?, ?, ?, ?)',
-                          (mac, 'Authorized Device', form.group.data, session.get('username')))
+                c.execute('INSERT INTO mab_devices (mac, description, group_name) VALUES (?, ?, ?)',
+                          (mac, 'Authorized Device', form.group.data))
                 c.execute('DELETE FROM pending_devices WHERE mac = ?', (mac,))
                 conn.commit()
                 response = cisco_ise_api_authorize(mac, form.group.data)
@@ -486,11 +481,7 @@ def edit_device(mac):
             form.mac.data = device[0]
             form.description.data = device[1]
             form.group.data = device[2]
-
-            form.assigned_user.data = device[3] if device[3] else ""  # Resolved conflict: Use main branch's safer logic
-
             form.assigned_user.data = device[3]
-
 
     return render_template('edit.html', form=form)
 
@@ -618,44 +609,6 @@ def export_devices():
 @role_required('Administrator')
 def import_devices():
     if 'file' not in request.files:
- 
-        flash('No file part', 'error')
-        return redirect(url_for('index', page='devices'))
-    file = request.files['file']
-    if file.filename == '':
-        flash('No selected file', 'error')
-        return redirect(url_for('index', page='devices'))
-    if file and file.filename.endswith('.csv'):
-        try:
-            stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
-            csv_input = csv.reader(stream)
-            next(csv_input)  # Skip header row
-
-            with sqlite3.connect('devices.db') as conn:
-                c = conn.cursor()
-                imported_count = 0
-                for row in csv_input:
-                    mac, description, group_name = row
-                    mac = bleach.clean(mac)
-                    description = bleach.clean(description)
-                    group_name = bleach.clean(group_name)
-
-                    if re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', mac):
-                        c.execute('INSERT OR REPLACE INTO mab_devices (mac, description, group_name) VALUES (?, ?, ?)',
-                                  (mac, description, group_name))
-                        imported_count += 1
-                conn.commit()
-            flash(f'Successfully imported {imported_count} devices.', 'success')
-            log_action(session.get('username'), session.get('role'), 'Import Devices', f"Imported {imported_count} devices from CSV")
-        except Exception as e:
-            flash(f'An error occurred during import: {e}', 'error')
-            log_action(session.get('username'), session.get('role'), 'Import Devices Failed', f"Error: {e}")
-        return redirect(url_for('index', page='devices'))
-    else:
-        flash('Invalid file type. Please upload a CSV file.', 'error')
-        return redirect(url_for('index', page='devices'))
-
-
         flash('No file part. Please select a file to upload.', 'error')
         return redirect(url_for('index', page='devices'))
     file = request.files['file']
@@ -696,7 +649,6 @@ def import_devices():
         log_action(session.get('username'), session.get('role'), 'Import Devices Failed', f"Error: {e}")
 
     return redirect(url_for('index', page='devices'))
-
 
 if __name__ == '__main__':
     init_db()
