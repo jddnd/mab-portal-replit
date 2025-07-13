@@ -1,31 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="bg-white p-6 rounded-lg shadow-md">
-    <h2 class="text-xl font-semibold mb-4">Add New MAB Device</h2>
-    <form method="POST" class="space-y-4">
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg max-w-lg mx-auto">
+    <h2 class="text-3xl font-bold mb-6">Add New MAB Device</h2>
+    <form method="POST" class="space-y-6">
         {{ form.hidden_tag() }}
         <div>
-            <label class="block text-sm font-medium text-gray-700">MAC Address</label>
-            {{ form.mac(class="mt-1 p-2 w-full border rounded-md") }}
+            <label class="block text-sm font-medium text-gray-400">MAC Address</label>
+            {{ form.mac(class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% if form.mac.errors %}
-                <p class="text-red-500 text-sm">{{ form.mac.errors[0] }}</p>
+                <p class="text-red-400 text-sm mt-1">{{ form.mac.errors[0] }}</p>
             {% endif %}
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Description</label>
-            {{ form.description(class="mt-1 p-2 w-full border rounded-md") }}
+            <label class="block text-sm font-medium text-gray-400">Description</label>
+            {{ form.description(class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% if form.description.errors %}
-                <p class="text-red-500 text-sm">{{ form.description.errors[0] }}</p>
+                <p class="text-red-400 text-sm mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Group</label>
-            {{ form.group(class="mt-1 p-2 w-full border rounded-md") }}
+            <label class="block text-sm font-medium text-gray-400">Group</label>
+            {{ form.group(class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% if form.group.errors %}
-                <p class="text-red-500 text-sm">{{ form.group.errors[0] }}</p>
+                <p class="text-red-400 text-sm mt-1">{{ form.group.errors[0] }}</p>
             {% endif %}
         </div>
-        {{ form.submit(class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600") }}
+        {{ form.submit(class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-md transition-colors duration-300 font-semibold") }}
     </form>
 </div>
 {% endblock %}

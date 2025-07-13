@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort, make_response
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, PasswordField, BooleanField
 from wtforms.validators import DataRequired, Regexp, Length, ValidationError
@@ -14,8 +14,9 @@ import requests
 import pyotp
 import qrcode
 import base64
-from io import BytesIO
+from io import BytesIO, StringIO
 import logging
+import csv
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecurekey123456')
@@ -40,7 +41,7 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS pending_devices
                      (mac TEXT PRIMARY KEY, seen TEXT, switch_ip TEXT, port TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS mab_devices
-                     (mac TEXT PRIMARY KEY, description TEXT, group_name TEXT)''')
+                     (mac TEXT PRIMARY KEY, description TEXT, group_name TEXT, assigned_user TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS users
                      (username TEXT PRIMARY KEY, password TEXT, role TEXT, totp_secret TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS settings
@@ -111,21 +112,21 @@ def cisco_ise_api_authorize(mac, group):
 
 # SNMP function
 def get_snmp_sysinfo(ip):
-    with sqlite3.connect('devices.db') as conn:
-        c = conn.cursor()
-        c.execute('SELECT value FROM settings WHERE key = ?', ('snmp_community',))
-        community = c.fetchone()[0] or 'public'
+    try:
+        with sqlite3.connect('devices.db') as conn:
+            c = conn.cursor()
+            c.execute('SELECT value FROM settings WHERE key = ?', ('snmp_community',))
+            community = c.fetchone()[0] or 'public'
 
-    sys_name_oid = '1.3.6.1.2.1.1.5.0'
-    sys_location_oid = '1.3.6.1.2.1.1.6.0'
-    result = {'name': 'Unknown', 'location': 'Unknown'}
+        sys_name_oid = '1.3.6.1.2.1.1.5.0'
+        sys_location_oid = '1.3.6.1.2.1.1.6.0'
+        result = {'name': 'SNMP Error', 'location': 'SNMP Error'}
 
-    for oid, key in [(sys_name_oid, 'name'), (sys_location_oid, 'location')]:
-        try:
+        for oid, key in [(sys_name_oid, 'name'), (sys_location_oid, 'location')]:
             iterator = getCmd(
                 SnmpEngine(),
                 CommunityData(community, mpModel=1),
-                UdpTransportTarget((ip, 161), timeout=3, retries=2),
+                UdpTransportTarget((ip, 161), timeout=1, retries=1),
                 ContextData(),
                 ObjectType(ObjectIdentity(oid))
             )
@@ -133,8 +134,10 @@ def get_snmp_sysinfo(ip):
             if not errorIndication and not errorStatus:
                 for varBind in varBinds:
                     result[key] = str(varBind[1])
-        except Exception as e:
-            logger.error(f"SNMP error for {ip}: {e}")
+            else:
+                logger.error(f"SNMP error for {ip} ({key}): {errorIndication or errorStatus.prettyPrint()}")
+    except Exception as e:
+        logger.error(f"Fatal SNMP error for {ip}: {e}")
     return result
 
 # Password complexity validator
@@ -154,8 +157,8 @@ def password_complexity(form, field):
 # Forms
 class AddDeviceForm(FlaskForm):
     mac = StringField('MAC Address', validators=[
-        DataRequired(), 
-        Regexp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', message="Invalid MAC address")
+        DataRequired(),
+        Regexp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', message="Invalid MAC address format")
     ])
     description = StringField('Description', validators=[DataRequired(), Length(min=3)])
     group = SelectField('Group', choices=[
@@ -181,11 +184,12 @@ class EditDeviceForm(FlaskForm):
     mac = StringField('MAC Address', validators=[DataRequired()], render_kw={"readonly": True})
     description = StringField('Description', validators=[DataRequired(), Length(min=3)])
     group = SelectField('Group', choices=[
-        ('Printers', 'Printers'), 
-        ('IoT_Meeting', 'IoT_Meeting'), 
-        ('Mgmt_AP', 'Mgmt_AP'), 
+        ('Printers', 'Printers'),
+        ('IoT_Meeting', 'IoT_Meeting'),
+        ('Mgmt_AP', 'Mgmt_AP'),
         ('Mgmt_SW', 'Mgmt_SW')
     ], validators=[DataRequired()])
+    assigned_user = SelectField('Assigned User', choices=[], validators=[DataRequired()])
     submit = SubmitField('Save Changes')
 
 class SettingsForm(FlaskForm):
@@ -350,9 +354,9 @@ def index(page):
             {"mac": row[0], "seen": row[1], "switch_ip": row[2], "port": row[3]}
             for row in c.fetchall()
         ]
-        c.execute('SELECT * FROM mab_devices')
+        c.execute('SELECT mac, description, group_name, assigned_user FROM mab_devices')
         mab_devices = [
-            {"mac": row[0], "desc": row[1], "group": row[2]}
+            {"mac": row[0], "desc": row[1], "group": row[2], "assigned_user": row[3]}
             for row in c.fetchall()
         ]
         if page == 'audit_log':
@@ -370,11 +374,17 @@ def index(page):
             for device in mab_devices:
                 group = device['group']
                 group_counts[group] = group_counts.get(group, 0) + 1
+
+            c.execute("SELECT assigned_user, COUNT(*) FROM mab_devices WHERE assigned_user IS NOT NULL GROUP BY assigned_user")
+            user_device_counts = c.fetchall()
+
             chart_data = {
                 'pending_count': len(pending_devices),
                 'authorized_count': len(mab_devices),
                 'group_labels': list(group_counts.keys()),
-                'group_counts': list(group_counts.values())
+                'group_counts': list(group_counts.values()),
+                'user_labels': [item[0] for item in user_device_counts],
+                'user_counts': [item[1] for item in user_device_counts]
             }
         else:
             chart_data = None
@@ -448,23 +458,31 @@ def edit_device(mac):
     form = EditDeviceForm()
     with sqlite3.connect('devices.db') as conn:
         c = conn.cursor()
+        c.execute('SELECT username FROM users')
+        users = [user[0] for user in c.fetchall()]
+        form.assigned_user.choices = [("", "-- Select User --")] + [(user, user) for user in users]
+
         c.execute('SELECT * FROM mab_devices WHERE mac = ?', (mac,))
         device = c.fetchone()
         if not device:
             log_action(session.get('username'), session.get('role'), 'Edit Device Failed', f"Device {mac} not found")
             abort(404)
-        if request.method == 'GET':
-            form.mac.data = device[0]
-            form.description.data = device[1]
-            form.group.data = device[2]
+
         if form.validate_on_submit():
             description = bleach.clean(form.description.data)
-            c.execute('UPDATE mab_devices SET description = ?, group_name = ? WHERE mac = ?',
-                      (description, form.group.data, mac))
+            c.execute('UPDATE mab_devices SET description = ?, group_name = ?, assigned_user = ? WHERE mac = ?',
+                      (description, form.group.data, form.assigned_user.data, mac))
             conn.commit()
             flash('Device updated successfully', 'success')
             log_action(session.get('username'), session.get('role'), 'Edit Device', f"Updated device {mac}")
             return redirect(url_for('index', page='devices'))
+
+        if request.method == 'GET':
+            form.mac.data = device[0]
+            form.description.data = device[1]
+            form.group.data = device[2]
+            form.assigned_user.data = device[3]
+
     return render_template('edit.html', form=form)
 
 @app.route('/delete-device/<mac>', methods=['POST'])
@@ -567,6 +585,70 @@ def delete_user(username):
     flash(f'User {username} deleted successfully', 'success')
     log_action(session.get('username'), session.get('role'), 'Delete User', f"Deleted user {username}")
     return redirect(url_for('manage_users'))
+
+@app.route('/export-devices')
+@role_required('Administrator')
+def export_devices():
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('SELECT mac, description, group_name FROM mab_devices')
+        devices = c.fetchall()
+
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(['mac', 'description', 'group_name'])
+    cw.writerows(devices)
+
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=mab_devices.csv"
+    output.headers["Content-type"] = "text/csv"
+    log_action(session.get('username'), session.get('role'), 'Export Devices', 'Exported MAB devices to CSV')
+    return output
+
+@app.route('/import-devices', methods=['POST'])
+@role_required('Administrator')
+def import_devices():
+    if 'file' not in request.files:
+        flash('No file part. Please select a file to upload.', 'error')
+        return redirect(url_for('index', page='devices'))
+    file = request.files['file']
+    if file.filename == '':
+        flash('No selected file. Please choose a file to import.', 'error')
+        return redirect(url_for('index', page='devices'))
+    if not file.filename.endswith('.csv'):
+        flash('Invalid file type. Only CSV files are allowed.', 'error')
+        return redirect(url_for('index', page='devices'))
+
+    try:
+        stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = csv.reader(stream)
+        header = next(csv_input)
+        if header != ['mac', 'description', 'group_name', 'assigned_user']:
+            flash('CSV file has incorrect headers. Expected: mac, description, group_name, assigned_user', 'error')
+            return redirect(url_for('index', page='devices'))
+
+        with sqlite3.connect('devices.db') as conn:
+            c = conn.cursor()
+            imported_count = 0
+            for row in csv_input:
+                mac, description, group_name, assigned_user = row
+                mac = bleach.clean(mac).strip()
+                description = bleach.clean(description).strip()
+                group_name = bleach.clean(group_name).strip()
+                assigned_user = bleach.clean(assigned_user).strip() or None
+
+                if re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', mac):
+                    c.execute('INSERT OR REPLACE INTO mab_devices (mac, description, group_name, assigned_user) VALUES (?, ?, ?, ?)',
+                              (mac, description, group_name, assigned_user))
+                    imported_count += 1
+            conn.commit()
+        flash(f'Successfully imported {imported_count} devices.', 'success')
+        log_action(session.get('username'), session.get('role'), 'Import Devices', f"Imported {imported_count} devices from CSV")
+    except Exception as e:
+        flash(f'An error occurred during import: {e}', 'error')
+        log_action(session.get('username'), session.get('role'), 'Import Devices Failed', f"Error: {e}")
+
+    return redirect(url_for('index', page='devices'))
 
 if __name__ == '__main__':
     init_db()
