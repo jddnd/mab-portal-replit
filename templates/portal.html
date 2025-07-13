@@ -1,47 +1,53 @@
 {% extends "base.html" %}
 {% block content %}
-<nav class="bg-gray-800 text-white p-4 mb-6 rounded-lg">
+<nav class="bg-gray-800/50 backdrop-blur-lg text-white p-4 mb-8 rounded-lg shadow-lg">
     <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
-            <a href="{{ url_for('index', page='dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'dashboard' else '' }}">Dashboard</a>
+            <a href="{{ url_for('index', page='dashboard') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'dashboard' else '' }}">Dashboard</a>
             {% if session['role'] in ['Administrator', 'Approver'] %}
-                <a href="{{ url_for('index', page='pending') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'pending' else '' }}">Pending</a>
+                <a href="{{ url_for('index', page='pending') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'pending' else '' }}">Pending</a>
             {% endif %}
             {% if session['role'] == 'Administrator' %}
-                <a href="{{ url_for('index', page='devices') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'devices' else '' }}">Devices</a>
-                <a href="{{ url_for('settings') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'settings' else '' }}">Settings</a>
-                <a href="{{ url_for('manage_users') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Manage Users</a>
-                <a href="{{ url_for('index', page='audit_log') }}" class="hover:bg-gray-700 px-3 py-2 rounded {{ 'bg-gray-700' if page == 'audit_log' else '' }}">Audit Log</a>
+                <a href="{{ url_for('index', page='devices') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'devices' else '' }}">Devices</a>
+                <a href="{{ url_for('settings') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'settings' else '' }}">Settings</a>
+                <a href="{{ url_for('manage_users') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300">Manage Users</a>
+                <a href="{{ url_for('index', page='audit_log') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300 {{ 'bg-gray-700/50' if page == 'audit_log' else '' }}">Audit Log</a>
             {% endif %}
-            <a href="{{ url_for('two_factor_setup') }}" class="hover:bg-gray-700 px-3 py-2 rounded">2FA Setup</a>
+            <a href="{{ url_for('two_factor_setup') }}" class="hover:bg-gray-700/50 px-3 py-2 rounded-md transition-colors duration-300">2FA Setup</a>
         </div>
         <div>
-            <a href="{{ url_for('logout') }}" class="hover:bg-gray-700 px-3 py-2 rounded">Logout</a>
+            <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md transition-colors duration-300">Logout</a>
         </div>
     </div>
 </nav>
 
 {% if page == 'dashboard' %}
-<div class="bg-white p-6 rounded-lg shadow-md">
-    <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
-    <p>Status and system insights</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <div class="bg-gray-100 p-4 rounded-lg">
-            <h3 class="text-lg font-medium">Pending Devices</h3>
-            <p>{{ chart_data.pending_count }} devices awaiting authorization</p>
+<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg">
+    <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
+    <p class="text-gray-400 mb-8">System status and key metrics</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-2">Pending Devices</h3>
+            <p class="text-4xl font-bold">{{ chart_data.pending_count }}</p>
         </div>
-        <div class="bg-gray-100 p-4 rounded-lg">
-            <h3 class="text-lg font-medium">Authorized Devices</h3>
-            <p>{{ chart_data.authorized_count }} devices authorized</p>
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-2">Authorized Devices</h3>
+            <p class="text-4xl font-bold">{{ chart_data.authorized_count }}</p>
         </div>
     </div>
-    <div class="mt-6">
-        <h3 class="text-lg font-medium mb-4">Device Status</h3>
-        <canvas id="deviceStatusChart" class="w-full max-w-md mx-auto"></canvas>
-    </div>
-    <div class="mt-6">
-        <h3 class="text-lg font-medium mb-4">Device Groups</h3>
-        <canvas id="groupDistributionChart" class="w-full max-w-md mx-auto"></canvas>
+    <div class="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-4">Device Status</h3>
+            <canvas id="deviceStatusChart"></canvas>
+        </div>
+        <div class="bg-gray-700/50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-4">Device Groups</h3>
+            <canvas id="groupDistributionChart"></canvas>
+        </div>
+        <div class="bg-gray-700/50 p-6 rounded-lg col-span-1 lg:col-span-2">
+            <h3 class="text-xl font-semibold mb-4">Devices Per User</h3>
+            <canvas id="userDeviceChart"></canvas>
+        </div>
     </div>
     <div class="mt-6">
         <h3 class="text-lg font-medium mb-4">Devices Per User</h3>
@@ -50,6 +56,9 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    Chart.defaults.color = '#a0aec0';
+    Chart.defaults.borderColor = '#4a5568';
+
     const deviceStatusChart = new Chart(document.getElementById('deviceStatusChart'), {
         type: 'bar',
         data: {
@@ -57,18 +66,15 @@
             datasets: [{
                 label: 'Device Count',
                 data: [{{ chart_data.pending_count }}, {{ chart_data.authorized_count }}],
-                backgroundColor: ['#4CAF50', '#2196F3'],
-                borderColor: ['#388E3C', '#1976D2'],
+                backgroundColor: ['#48bb78', '#4299e1'],
+                borderColor: ['#38a169', '#3182ce'],
                 borderWidth: 1
             }]
         },
         options: {
             scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Number of Devices' }
-                },
-                x: { title: { display: true, text: 'Status' } }
+                y: { beginAtZero: true, grid: { color: '#4a5568' } },
+                x: { grid: { color: '#4a5568' } }
             },
             plugins: { legend: { display: false } }
         }
@@ -81,15 +87,15 @@
             datasets: [{
                 label: 'Devices by Group',
                 data: {{ chart_data.group_counts | tojson }},
-                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'],
-                borderColor: ['#FF4069', '#1E87D8', '#FFB300', '#3DA8A8'],
-                borderWidth: 1
+                backgroundColor: ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#4299e1'],
+                borderColor: '#2d3748',
+                borderWidth: 2
             }]
         },
         options: {
             plugins: {
-                legend: { position: 'right' },
-                title: { display: true, text: 'Device Group Distribution' }
+                legend: { position: 'right', labels: { color: '#a0aec0' } },
+                title: { display: true, text: 'Device Group Distribution', color: '#a0aec0' }
             }
         }
     });
