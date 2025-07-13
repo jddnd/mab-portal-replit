@@ -1,0 +1,77 @@
+/* Global styles for Cisco ISE Device Portal */
+
+/* Ensure readable text in inputs and textareas */
+input,
+textarea {
+    color: #ffffff !important; /* White text for dark backgrounds */
+    background-color: #e5e7eb !important; /* Light gray background */
+    padding: 0.5rem;
+    border: 1px solid #4a5568;
+    border-radius: 0.25rem;
+}
+
+input:focus,
+textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #4299e1; /* Blue focus ring */
+    color: #ffffff !important; /* Maintain text visibility on focus */
+}
+
+/* Fallback for light themes */
+@media (prefers-color-scheme: light) {
+    input,
+    textarea {
+        color: #000000 !important; /* Black text for light backgrounds */
+        background-color: #ffffff !important; /* White background */
+    }
+}
+
+/* Table styles for visibility */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #4a5568; /* Dark gray background */
+    color: #ffffff; /* White text */
+}
+
+th {
+    background-color: #2d3748; /* Slightly darker header */
+    padding: 0.5rem 1rem;
+    text-align: left;
+}
+
+td {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #718096; /* Light border for row separation */
+}
+
+tr {
+    background-color: #4a5568; /* Consistent row background */
+}
+
+/* Override for specific tables if needed */
+.table-auto th,
+.table-auto td {
+    padding: 0.75rem 1rem; /* Adjust padding for auto-layout tables */
+}
+
+/* Flash message styles */
+.flashed-message {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    z-index: 50;
+}
+
+.flashed-message.error {
+    background-color: #e53e3e; /* Red for errors */
+    color: #ffffff;
+}
+
+.flashed-message.success {
+    background-color: #48bb78; /* Green for success */
+    color: #ffffff;
+}
