@@ -484,7 +484,7 @@ def edit_device(mac):
             form.mac.data = device[0]
             form.description.data = device[1]
             form.group.data = device[2]
-            form.assigned_user.data = device[3] if device[3] else ""
+            form.assigned_user.data = device[3] if device[3] else ""  # Resolved conflict: Use main branch's safer logic
 
     return render_template('edit.html', form=form)
 
