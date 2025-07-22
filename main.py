@@ -209,6 +209,14 @@ class UserForm(FlaskForm):
     ], validators=[DataRequired()])
     submit = SubmitField('Add User')
 
+class EditUserForm(FlaskForm):
+    role = SelectField('Role', choices=[
+        ('Administrator', 'Administrator'),
+        ('Approver', 'Approver'),
+        ('Contributor', 'Contributor')
+    ], validators=[DataRequired()])
+    submit = SubmitField('Save Changes')
+
 class TwoFactorForm(FlaskForm):
     totp_code = StringField('2FA Code', validators=[DataRequired(), Length(min=6, max=6)])
     submit = SubmitField('Verify')
@@ -604,6 +612,30 @@ def disable_2fa(username):
     flash(f'2FA disabled for user {username}', 'success')
     log_action(session.get('username'), session.get('role'), 'Disable 2FA', f"Disabled 2FA for user {username}")
     return redirect(url_for('manage_users'))
+
+@app.route('/edit-user/<username>', methods=['GET', 'POST'])
+@role_required('Administrator')
+def edit_user(username):
+    username = bleach.clean(username)
+    form = EditUserForm()
+    with sqlite3.connect('devices.db') as conn:
+        c = conn.cursor()
+        c.execute('SELECT username, role FROM users WHERE username = ?', (username,))
+        user = c.fetchone()
+        if not user:
+            abort(404)
+
+        if form.validate_on_submit():
+            c.execute('UPDATE users SET role = ? WHERE username = ?', (form.role.data, username))
+            conn.commit()
+            flash(f'User {username} updated successfully', 'success')
+            log_action(session.get('username'), session.get('role'), 'Edit User', f"Updated user {username} with role {form.role.data}")
+            return redirect(url_for('manage_users'))
+
+        if request.method == 'GET':
+            form.role.data = user[1]
+
+    return render_template('edit_user.html', form=form, user={'username': user[0]})
 
 @app.route('/delete-user/<username>', methods=['POST'])
 @role_required('Administrator')

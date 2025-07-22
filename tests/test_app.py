@@ -63,5 +63,31 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Dashboard', response.data)
 
+    def test_edit_user(self):
+        print("Starting test_edit_user")
+        # Log in as admin
+        self.app.post('/login', data=dict(
+            username='admin',
+            password='StrongPassword123'
+        ), follow_redirects=True)
+        print("Logged in")
+
+        # Access the edit user page
+        response = self.app.get('/edit-user/contributor', follow_redirects=True)
+        print("Accessed edit user page")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Edit User: contributor', response.data)
+        print("Asserted edit user page content")
+
+        # Edit the user's role
+        response = self.app.post('/edit-user/contributor', data=dict(
+            role='Approver',
+            submit='Save Changes'
+        ), follow_redirects=True)
+        print("Posted to edit user")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'User contributor updated successfully', response.data)
+        print("Finished test_edit_user")
+
 if __name__ == '__main__':
     unittest.main()
