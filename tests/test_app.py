@@ -37,7 +37,7 @@ class AppTestCase(unittest.TestCase):
         # Test logout
         response = self.app.get('/logout', follow_redirects=True)
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Login', response.data)
+        self.assertIn(b'Sign in', response.data)
 
     def test_invalid_login(self):
         # Test login with invalid credentials
@@ -52,7 +52,7 @@ class AppTestCase(unittest.TestCase):
         # Test accessing dashboard without logging in
         response = self.app.get('/', follow_redirects=True)
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Login', response.data)
+        self.assertIn(b'Sign in', response.data)
 
         # Test accessing dashboard after logging in
         self.app.post('/login', data=dict(

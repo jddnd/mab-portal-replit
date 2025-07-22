@@ -1,32 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg max-w-md mx-auto">
-    <h2 class="text-3xl font-bold mb-6">2FA Setup</h2>
-    <form method="POST" class="space-y-6">
-        {{ form.hidden_tag() }}
-        <div>
-            <label class="flex items-center text-gray-400">
-                {{ form.enable_2fa(class="form-checkbox h-5 w-5 text-blue-500 bg-gray-900 border-gray-600 focus:ring-blue-500") }}
-                <span class="ml-2">{{ form.enable_2fa.label.text }}</span>
-            </label>
-            {% if form.enable_2fa.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.enable_2fa.errors[0] }}</p>
-            {% endif %}
-        </div>
-        {% if qr_code %}
-            <div class="text-center">
-                <p class="mb-4 text-gray-400">Scan this QR code with your authenticator app:</p>
-                <img src="data:image/png;base64,{{ qr_code }}" alt="2FA QR Code" class="mb-4 inline-block bg-white p-2 rounded-lg">
-                <p class="mb-4 text-gray-400">Or manually enter the secret:</p>
-                <p class="text-lg font-mono bg-gray-900 p-2 rounded-md inline-block">{{ totp_secret }}</p>
+<div class="max-w-md mx-auto mt-10">
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-8">
+        <h2 class="text-2xl font-bold text-gray-700 mb-6">2FA Setup</h2>
+        <form method="POST" class="space-y-6">
+            {{ form.hidden_tag() }}
+            <div>
+                <label class="flex items-center">
+                    {{ form.enable_2fa(class="form-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                    <span class="ml-2 text-gray-700">{{ form.enable_2fa.label.text }}</span>
+                </label>
+                {% if form.enable_2fa.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ form.enable_2fa.errors[0] }}</p>
+                {% endif %}
             </div>
-        {% elif totp_secret %}
-            <p class="text-green-400">2FA is currently enabled.</p>
-        {% else %}
-            <p class="text-yellow-400">2FA is currently disabled.</p>
-        {% endif %}
-        {{ form.submit(class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-md transition-colors duration-300 font-semibold") }}
-    </form>
-    <a href="{{ url_for('index', page='dashboard') }}" class="block text-center mt-6 text-blue-400 hover:text-blue-300">Back to Dashboard</a>
+
+            {% if qr_code %}
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="mb-4 text-gray-600">Scan this QR code with your authenticator app:</p>
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="2FA QR Code" class="mb-4 inline-block bg-white p-2 rounded-lg border border-gray-200">
+                    <p class="mb-2 text-gray-600">Or manually enter the secret:</p>
+                    <p class="text-lg font-mono bg-gray-100 text-gray-800 p-2 rounded-md inline-block">{{ totp_secret }}</p>
+                </div>
+            {% elif totp_secret %}
+                <p class="text-green-600 bg-green-50 p-4 rounded-md">2FA is currently enabled.</p>
+            {% else %}
+                <p class="text-yellow-600 bg-yellow-50 p-4 rounded-md">2FA is currently disabled.</p>
+            {% endif %}
+
+            {{ form.submit(class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-3 rounded-md transition-colors duration-300") }}
+        </form>
+        <div class="mt-6 text-center">
+            <a href="{{ url_for('index', page='dashboard') }}" class="text-sm text-blue-600 hover:underline">Back to Dashboard</a>
+        </div>
+    </div>
 </div>
 {% endblock %}

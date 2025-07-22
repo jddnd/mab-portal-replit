@@ -1,19 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="flex items-center justify-center min-h-screen">
-    <div class="bg-gray-800/50 backdrop-blur-lg p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h2 class="text-3xl font-bold mb-6 text-center">Verify 2FA Code</h2>
-        <form method="POST" class="space-y-6">
-            {{ form.hidden_tag() }}
-            <div>
-                <label class="block text-sm font-medium text-gray-400">2FA Code</label>
-                <input type="text" name="totp_code" class="mt-1 p-3 w-full border border-gray-600 rounded-md bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                {% if form.totp_code.errors %}
-                    <p class="text-red-400 text-sm mt-1">{{ form.totp_code.errors[0] }}</p>
-                {% endif %}
-            </div>
-            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-md transition-colors duration-300 font-semibold">Verify</button>
-        </form>
+<div class="flex items-center justify-center min-h-screen -mt-16">
+    <div class="w-full max-w-md">
+        <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-8">
+            <h2 class="text-2xl font-bold text-gray-700 mb-6 text-center">Verify 2FA Code</h2>
+            <form method="POST" class="space-y-6">
+                {{ form.hidden_tag() }}
+                <div>
+                    <label for="totp_code" class="sr-only">2FA Code</label>
+                    <input type="text" name="totp_code" id="totp_code" placeholder="Enter your 2FA code"
+                           class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    {% if form.totp_code.errors %}
+                        <p class="text-red-500 text-xs mt-1">{{ form.totp_code.errors[0] }}</p>
+                    {% endif %}
+                </div>
+                <button type="submit"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-3 rounded-md transition-colors duration-300">
+                    Verify
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}
