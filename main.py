@@ -213,6 +213,12 @@ class TwoFactorForm(FlaskForm):
     totp_code = StringField('2FA Code', validators=[DataRequired(), Length(min=6, max=6)])
     submit = SubmitField('Verify')
 
+class ChangePasswordForm(FlaskForm):
+    old_password = PasswordField('Old Password', validators=[DataRequired()])
+    new_password = PasswordField('New Password', validators=[DataRequired(), password_complexity])
+    confirm_password = PasswordField('Confirm New Password', validators=[DataRequired()])
+    submit = SubmitField('Change Password')
+
 class TwoFactorSetupForm(FlaskForm):
     enable_2fa = BooleanField('Enable Two-Factor Authentication')
     submit = SubmitField('Save 2FA Settings')
@@ -234,36 +240,53 @@ def role_required(*roles):
     return decorator
 
 # 2FA setup and verification
-@app.route('/2fa-setup', methods=['GET', 'POST'])
-def two_factor_setup():
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
+@app.route('/profile', methods=['GET', 'POST'])
+@role_required('Administrator', 'Approver', 'Contributor')
+def profile():
+    password_form = ChangePasswordForm(prefix='password')
+    two_factor_form = TwoFactorSetupForm(prefix='2fa')
     username = session.get('username')
-    form = TwoFactorSetupForm()
+
     with sqlite3.connect('devices.db') as conn:
         c = conn.cursor()
-        c.execute('SELECT totp_secret FROM users WHERE username = ?', (username,))
-        totp_secret = c.fetchone()[0]
-    
-    qr_code = None
-    new_totp_secret = totp_secret
-    if form.validate_on_submit():
-        if form.enable_2fa.data:
-            if not totp_secret:  # Generate new secret only if 2FA is being enabled
-                new_totp_secret = pyotp.random_base32()
-                c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', (new_totp_secret, username))
+        c.execute('SELECT password, totp_secret FROM users WHERE username = ?', (username,))
+        user = c.fetchone()
+        current_password_hash, totp_secret = user[0], user[1]
+
+        if password_form.validate_on_submit() and password_form.submit.data:
+            if bcrypt.check_password_hash(current_password_hash, password_form.old_password.data):
+                if password_form.new_password.data == password_form.confirm_password.data:
+                    new_password_hash = bcrypt.generate_password_hash(password_form.new_password.data).decode('utf-8')
+                    c.execute('UPDATE users SET password = ? WHERE username = ?', (new_password_hash, username))
+                    conn.commit()
+                    flash('Password updated successfully', 'success')
+                    log_action(username, session.get('role'), 'Password Change', 'User changed their password')
+                    return redirect(url_for('profile'))
+                else:
+                    flash('New passwords do not match', 'error')
+            else:
+                flash('Invalid old password', 'error')
+
+        if two_factor_form.validate_on_submit() and two_factor_form.submit.data:
+            if two_factor_form.enable_2fa.data:
+                if not totp_secret:
+                    new_totp_secret = pyotp.random_base32()
+                    c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', (new_totp_secret, username))
+                    conn.commit()
+                    totp_secret = new_totp_secret
+                    log_action(username, session.get('role'), '2FA Enabled', 'Enabled 2FA and generated new TOTP secret')
+                    flash('2FA enabled successfully', 'success')
+            else:
+                c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', ('', username))
                 conn.commit()
-                log_action(username, session.get('role'), '2FA Enabled', 'Enabled 2FA and generated new TOTP secret')
-        else:
-            c.execute('UPDATE users SET totp_secret = ? WHERE username = ?', ('', username))
-            conn.commit()
-            new_totp_secret = ''
-            log_action(username, session.get('role'), '2FA Disabled', 'Disabled 2FA')
-        flash('2FA settings updated successfully', 'success')
-        return redirect(url_for('two_factor_setup'))
-    
-    if new_totp_secret:
-        totp = pyotp.TOTP(new_totp_secret)
+                totp_secret = ''
+                log_action(username, session.get('role'), '2FA Disabled', 'Disabled 2FA')
+                flash('2FA disabled successfully', 'success')
+            return redirect(url_for('profile'))
+
+    qr_code = None
+    if totp_secret:
+        totp = pyotp.TOTP(totp_secret)
         qr_uri = totp.provisioning_uri(name=username, issuer_name='Cisco ISE Device Portal')
         qr = qrcode.QRCode(version=1, box_size=10, border=4)
         qr.add_data(qr_uri)
@@ -272,8 +295,8 @@ def two_factor_setup():
         buffer = BytesIO()
         img.save(buffer, format="PNG")
         qr_code = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    
-    return render_template('2fa_setup.html', form=form, qr_code=qr_code, totp_secret=new_totp_secret)
+
+    return render_template('profile.html', password_form=password_form, two_factor_form=two_factor_form, qr_code=qr_code, totp_secret=totp_secret)
 
 @app.route('/2fa-verify', methods=['GET', 'POST'])
 def two_factor_verify():
